@@ -1,0 +1,3143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Cheer Choreo - 演技構成デモ v2</title>
+<style>
+  :root {
+    --bg: #0e1220;
+    --panel: #1a2036;
+    --panel-2: #232b48;
+    --accent: #ff5fa2;
+    --accent-2: #6ed3ff;
+    --accent-3: #ffd166;
+    --text: #f1f3fb;
+    --muted: #8d95b3;
+    --base: #4ea1ff;
+    --top: #ff5fa2;
+    --spotter: #ffbf47;
+    --backspot: #65e5b1;
+    --floor: #f5ecd3;
+    --floor-line: #b9a574;
+    --floor-line-strong: #6a5a32;
+    --center-mat: #fff5d8;
+    --ok: #65e5b1;
+    --ng: #ff7a8a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    overflow: hidden; touch-action: manipulation;
+  }
+  .app {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100vh;
+  }
+  /* Header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; background: linear-gradient(90deg, #161b30, #1d2440);
+    border-bottom: 1px solid #2a3155; gap: 8px; flex-wrap: wrap;
+  }
+  .title {
+    font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .title .pom { color: var(--accent); }
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .seg {
+    display: inline-flex; background: #11162a;
+    border-radius: 8px; border: 1px solid #34406d; overflow: hidden;
+  }
+  .seg button {
+    background: transparent; border: none; color: var(--muted);
+    padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .btn {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid #34406d; border-radius: 8px;
+    padding: 6px 10px; font-size: 12px; font-weight: 600;
+    cursor: pointer; user-select: none; transition: all .15s;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; }
+
+  /* Main area */
+  main {
+    display: grid;
+    grid-template-columns: 84px 1fr 260px;
+    gap: 8px; padding: 8px; min-height: 0;
+  }
+  @media (max-width: 820px) {
+    main { grid-template-columns: 64px 1fr; }
+    .right-panel { display: none; }
+    .right-panel.show-mobile { display: flex; position: fixed; top: 50px; right: 4px; bottom: 80px; width: 250px; z-index: 50; box-shadow: -4px 0 20px rgba(0,0,0,0.5); }
+  }
+
+  /* Count Bar (LEFT) */
+  .count-bar {
+    background: var(--panel); border-radius: 12px; padding: 8px 4px;
+    overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+    min-height: 0;
+  }
+  .count-bar h3 {
+    margin: 2px 4px 4px; font-size: 10px; color: var(--muted);
+    letter-spacing: 1.5px; text-align: center;
+  }
+  .count-frame-group {
+    background: var(--panel-2); border-radius: 8px; padding: 4px;
+    display: flex; flex-direction: column; gap: 2px;
+    border: 2px solid transparent;
+  }
+  .count-frame-group.active { border-color: var(--accent); }
+  .count-frame-name {
+    font-size: 9px; color: var(--accent-2); font-weight: 700;
+    text-align: center; padding: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .count-cell {
+    display: flex; align-items: center; justify-content: center;
+    height: 22px; border-radius: 4px; font-size: 11px; font-weight: 700;
+    background: #11162a; color: var(--muted);
+    transition: all .15s; cursor: pointer;
+  }
+  .count-cell:hover { background: #1a223e; }
+  .count-cell.now {
+    background: var(--accent-2); color: #062436;
+    transform: scale(1.08); box-shadow: 0 0 0 2px rgba(110,211,255,0.3);
+  }
+  .count-cell.passed { background: rgba(110,211,255,0.15); color: var(--accent-2); }
+  .count-cell.scrub {
+    background: var(--accent-3); color: #4a3500;
+    transform: scale(1.12); box-shadow: 0 0 0 2px rgba(255,209,102,0.5);
+  }
+  /* Scrub controls */
+  .scrub-controls {
+    display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+    background: var(--panel-2); border-radius: 8px; padding: 4px 6px;
+    margin-bottom: 6px; font-size: 11px;
+  }
+  .scrub-controls .btn { padding: 4px 8px; font-size: 12px; }
+  .scrub-controls .step-btn {
+    background: #11162a; border-color: var(--accent-2); color: var(--accent-2);
+    font-size: 14px; min-width: 32px;
+  }
+  .scrub-controls .scrub-info {
+    color: var(--accent-3); font-weight: 700; font-size: 11px;
+    flex: 1; min-width: 120px;
+  }
+  .scrub-controls .scrub-info.idle { color: var(--muted); font-weight: 400; }
+  .scrub-controls .split-btn {
+    background: var(--accent-3); color: #4a3500; border-color: var(--accent-3);
+  }
+  .scrub-controls .exit-btn {
+    background: var(--ng); color: #fff; border-color: var(--ng);
+    font-weight: 800;
+  }
+  /* Floor scrub-mode visual indicator */
+  .floor.scrub-active {
+    outline: 4px solid var(--accent-3);
+    outline-offset: -2px;
+  }
+  .scrub-banner {
+    position: absolute;
+    top: 8px; left: 50%; transform: translateX(-50%);
+    background: var(--accent-3); color: #4a3500;
+    font-size: 12px; font-weight: 800;
+    padding: 6px 14px; border-radius: 14px;
+    z-index: 25;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    display: none;
+  }
+  .floor.scrub-active .scrub-banner { display: block; }
+  .scrub-controls .undo-btn, .scrub-controls .redo-btn {
+    background: #11162a; border-color: #4a5285;
+    color: var(--accent-3); font-size: 14px;
+    padding: 4px 9px; font-weight: 800;
+  }
+  .scrub-controls .undo-btn:disabled, .scrub-controls .redo-btn:disabled {
+    opacity: 0.3; cursor: not-allowed;
+  }
+  /* Save toast — appears at top center when action is recorded */
+  .save-toast {
+    position: fixed;
+    top: 56px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    background: var(--ok);
+    color: #043928;
+    font-size: 13px;
+    font-weight: 800;
+    padding: 8px 18px;
+    border-radius: 22px;
+    z-index: 250;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    white-space: nowrap;
+  }
+  .save-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Preset menu */
+  .preset-menu {
+    position: fixed;
+    top: 56px; right: 12px;
+    background: var(--panel);
+    border: 2px solid var(--accent-2);
+    border-radius: 12px;
+    padding: 8px;
+    z-index: 150;
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    min-width: 200px;
+  }
+  .preset-menu.show { display: flex; }
+  .preset-menu .preset-title {
+    font-size: 11px; color: var(--muted); padding: 2px 6px; letter-spacing: 1px;
+  }
+  .preset-menu button {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid #34406d; border-radius: 8px;
+    padding: 10px 12px; font-size: 13px; font-weight: 600;
+    text-align: left; cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .preset-menu button:active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .preset-menu .preset-icon {
+    font-size: 16px; width: 24px; text-align: center;
+  }
+  .preset-overlay {
+    position: fixed; inset: 0;
+    background: transparent;
+    z-index: 149;
+    display: none;
+  }
+  .preset-overlay.show { display: block; }
+
+  /* Floor area */
+  .floor-wrap {
+    background: var(--panel); border-radius: 12px; padding: 8px;
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    position: relative;
+  }
+  /* Member Control card — absolute overlay, click-through background */
+  .member-control {
+    position: absolute;
+    top: 32px;
+    left: 8px;
+    right: 8px;
+    margin: 0;
+    display: none;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+    z-index: 30;
+    padding: 6px 8px;
+    background: rgba(26,32,54,0.92);
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+  }
+  .member-control.show { display: flex; }
+  /* Inner controls still capture pointer (buttons/selects) but card background is opaque */
+  .mc-name {
+    font-weight: 800; color: var(--accent);
+    font-size: 13px;
+    background: rgba(255,255,255,0.95);
+    padding: 2px 8px; border-radius: 6px;
+  }
+  .mc-role-badge {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px;
+    color: #fff;
+  }
+  .mc-row {
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .mc-label {
+    font-size: 10px; color: var(--muted); margin-right: 2px;
+  }
+  .mc-btn {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid #34406d; border-radius: 6px;
+    padding: 4px 8px; font-size: 11px; font-weight: 600;
+    cursor: pointer; min-width: 30px;
+  }
+  .mc-btn:active { transform: scale(0.94); }
+  .mc-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .mc-btn.warn { background: var(--accent-3); border-color: var(--accent-3); color: #4a3500; }
+  .mc-btn.danger { background: transparent; color: var(--ng); border-color: var(--ng); }
+  .mc-nudge {
+    background: #11162a; border: 1px solid var(--accent-2); color: var(--accent-2);
+    border-radius: 6px; padding: 3px 8px; font-size: 14px; font-weight: 800;
+    cursor: pointer; min-width: 28px;
+  }
+  .mc-nudge:active { background: var(--accent-2); color: #062436; }
+  .mc-select {
+    background: #11162a; color: var(--text); border: 1px solid #34406d;
+    border-radius: 5px; padding: 3px 4px; font-size: 11px;
+  }
+  /* Dim non-selected when something is selected */
+  .floor.has-selection .token:not(.selected),
+  .floor.has-selection .figure:not(.selected) {
+    opacity: 0.4;
+    transition: opacity 0.2s;
+  }
+  .floor.has-selection.tap-move-active {
+    cursor: crosshair;
+  }
+  .tap-move-banner {
+    position: absolute;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(255,209,102,0.95); color: #4a3500;
+    padding: 10px 16px; border-radius: 12px;
+    font-weight: 800; font-size: 14px;
+    pointer-events: none; z-index: 60;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.05); } }
+  .floor-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; font-size: 11px; color: var(--muted);
+    flex-wrap: wrap; gap: 4px;
+  }
+  .floor-header .frame-info { color: var(--text); font-weight: 600; font-size: 12px; }
+  .floor-outer {
+    flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .floor {
+    position: relative;
+    background: var(--floor);
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 3px var(--floor-line-strong), 0 4px 16px rgba(0,0,0,0.4);
+    touch-action: none;
+    overflow: hidden;
+  }
+  /* Mat strip lines */
+  .mat-strip {
+    position: absolute; top: 0; bottom: 0;
+    border-left: 1px solid var(--floor-line);
+  }
+  .mat-strip:first-child { border-left: none; }
+  .mat-strip.center-mat {
+    background: var(--center-mat);
+  }
+  /* Center horizontal line */
+  .center-h-line {
+    position: absolute; left: 0; right: 0; top: 50%;
+    height: 1px; background: var(--floor-line);
+    pointer-events: none;
+  }
+  /* Center×center mark */
+  .center-cross {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .center-cross::before, .center-cross::after {
+    content: ""; position: absolute; background: #c9332e;
+  }
+  .center-cross::before {
+    width: 36px; height: 3px; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .center-cross::after {
+    width: 3px; height: 36px; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .center-cross .ring {
+    position: absolute; width: 26px; height: 26px;
+    border: 2px solid #c9332e; border-radius: 50%;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(255,255,255,0.6);
+  }
+  .center-cross .label {
+    position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    font-size: 8px; color: #c9332e; font-weight: 800;
+    background: rgba(255,255,255,0.85); padding: 1px 4px;
+    border-radius: 3px; white-space: nowrap;
+  }
+  /* Mat numbers (top) */
+  .mat-num {
+    position: absolute; top: 2px;
+    font-size: 9px; color: var(--floor-line-strong);
+    font-weight: 700; transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .audience-label {
+    position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+    font-size: 9px; color: var(--floor-line-strong); letter-spacing: 6px;
+    font-weight: 700;
+  }
+  .judges-label {
+    position: absolute; bottom: 4px; left: 6px;
+    font-size: 8px; color: var(--floor-line-strong); letter-spacing: 1px;
+    font-weight: 600;
+  }
+
+  /* Token */
+  .token {
+    position: absolute; transform: translate(-50%, -50%);
+    width: var(--token-size, 44px); height: var(--token-size, 44px); border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700;
+    font-size: clamp(8px, calc(var(--token-size, 44px) * 0.22), 11px);
+    cursor: grab; user-select: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    border: 3px solid #fff;
+    transition: box-shadow .15s, transform .35s cubic-bezier(.5,.1,.3,1);
+    will-change: transform; z-index: 3;
+    touch-action: none;
+    -webkit-touch-callout: none;
+  }
+  .token:active { cursor: grabbing; }
+  .token.dragging { transition: none; z-index: 10; }
+  .token .name { line-height: 1; pointer-events: none; max-width: calc(var(--token-size, 44px) * 0.92);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+  .token .role-tag { font-size: clamp(7px, calc(var(--token-size, 44px) * 0.18), 8px); opacity: 0.85; margin-top: 1px; pointer-events: none; }
+  .token.role-base     { background: var(--base); }
+  .token.role-top      { background: var(--top); width: calc(var(--token-size, 44px) * 0.86); height: calc(var(--token-size, 44px) * 0.86); }
+  .token.role-spotter  { background: var(--spotter); color: #4a3500; }
+  .token.role-backspot { background: var(--backspot); color: #043928; }
+  .token.level-shoulder {
+    box-shadow: 0 0 0 3px rgba(255,209,102,0.6), 0 6px 14px rgba(0,0,0,0.3);
+  }
+  .token.level-extension {
+    box-shadow: 0 0 0 5px rgba(255,209,102,0.85), 0 0 0 9px rgba(255,209,102,0.3), 0 10px 22px rgba(0,0,0,0.45);
+    transform: translate(-50%, -50%) scale(1.18);
+  }
+  .token.selected { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+  .body-pos-badge {
+    position: absolute; top: -6px; right: -6px;
+    background: var(--accent-3); color: #4a3500;
+    font-size: 8px; font-weight: 800;
+    border-radius: 6px; padding: 1px 4px;
+    border: 1.5px solid #fff;
+  }
+
+  /* === Front view === */
+  .floor.front-view {
+    background: linear-gradient(to bottom, #1c1f3a 0%, #2a3460 30%, #4a5285 49.5%, #5a5a55 50%, #c8b687 50.5%, #ede2c0 100%);
+    box-shadow: inset 0 0 0 3px var(--floor-line-strong), 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .figure {
+    position: absolute; transform-origin: center bottom;
+    transition: transform 0.4s cubic-bezier(.4,.05,.3,1), left 0.4s cubic-bezier(.4,.05,.3,1), top 0.4s cubic-bezier(.4,.05,.3,1);
+    cursor: grab;
+    will-change: transform, left, top;
+    z-index: 3;
+    user-select: none;
+    touch-action: none;
+  }
+  .figure:active { cursor: grabbing; }
+  .figure.dragging { transition: none; z-index: 10; }
+  .figure svg { display: block; overflow: visible; }
+  .figure .name-label {
+    position: absolute; left: 50%; top: 100%;
+    transform: translate(-50%, 4px);
+    font-size: 10px; font-weight: 700; color: #1a1a1a;
+    background: rgba(255,255,255,0.85); padding: 1px 5px;
+    border-radius: 6px; white-space: nowrap;
+    pointer-events: none;
+  }
+  .figure .role-bar {
+    height: 3px; border-radius: 2px;
+    margin-top: 1px;
+  }
+  .figure.selected svg { filter: drop-shadow(0 0 4px var(--accent-2)) drop-shadow(0 0 8px var(--accent-2)); }
+  .figure.role-base svg [data-color="primary"]     { fill: var(--base);     stroke: var(--base); }
+  .figure.role-top svg [data-color="primary"]      { fill: var(--top);      stroke: var(--top); }
+  .figure.role-spotter svg [data-color="primary"]  { fill: var(--spotter);  stroke: var(--spotter); }
+  .figure.role-backspot svg [data-color="primary"] { fill: var(--backspot); stroke: var(--backspot); }
+  /* Floor center cross in front view */
+  .floor.front-view .center-cross-fv {
+    position: absolute; bottom: 0; left: 50%;
+    width: 30px; height: 30px;
+    transform: translate(-50%, 0);
+    pointer-events: none;
+  }
+  .floor.front-view .center-cross-fv::before {
+    content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
+    width: 3px; background: #c9332e; transform: translateX(-50%);
+  }
+  .floor.front-view .center-cross-fv::after {
+    content: "C×C"; position: absolute; bottom: -2px; left: 50%;
+    transform: translateX(-50%); color: #c9332e;
+    font-size: 9px; font-weight: 800;
+    background: rgba(255,255,255,0.85); padding: 0 3px;
+    border-radius: 3px; white-space: nowrap;
+  }
+
+  /* Right panel */
+  .right-panel {
+    background: var(--panel); border-radius: 12px;
+    display: flex; flex-direction: column; min-height: 0;
+    overflow: hidden;
+  }
+  .panel-tabs { display: flex; border-bottom: 1px solid #2a3155; }
+  .panel-tabs button {
+    flex: 1; background: transparent; border: none; color: var(--muted);
+    padding: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .panel-tabs button.on { color: var(--text); border-bottom: 2px solid var(--accent); }
+  .panel-section { display: none; padding: 8px; overflow-y: auto; flex: 1; min-height: 0; }
+  .panel-section.on { display: flex; flex-direction: column; gap: 6px; }
+  .panel-section h4 { margin: 4px 0 2px; font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+
+  /* Roster */
+  .roster-item {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--panel-2); border-radius: 8px; padding: 6px;
+    font-size: 12px;
+  }
+  .role-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid #fff;
+  }
+  .roster-item input.name-input {
+    flex: 1; background: transparent; border: none; color: var(--text);
+    font-size: 12px; font-weight: 600; outline: none; min-width: 0;
+  }
+  .roster-item select {
+    background: #11162a; color: var(--text); border: 1px solid #34406d;
+    border-radius: 5px; font-size: 10px; padding: 2px;
+  }
+  .roster-item .del {
+    background: transparent; border: none; color: var(--muted);
+    font-size: 14px; cursor: pointer; padding: 0 2px;
+  }
+
+  /* Stunts */
+  .stunt-card {
+    background: var(--panel-2); border-radius: 8px; padding: 8px 10px;
+    font-size: 12px; display: flex; flex-direction: column; gap: 5px;
+    border: 1px solid #34406d;
+  }
+  .stunt-card .stunt-header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #34406d; padding-bottom: 5px; margin-bottom: 2px;
+  }
+  .stunt-card .name-line { font-weight: 700; color: var(--accent-3); font-size: 13px; }
+  .stunt-card .role-row { display: flex; align-items: center; gap: 6px; }
+  .stunt-card .role-tag {
+    display: inline-block; min-width: 56px; font-size: 10px; font-weight: 700;
+    text-align: center; padding: 2px 4px; border-radius: 4px; color: #fff;
+    flex-shrink: 0;
+  }
+  .stunt-card .role-tag.role-top      { background: var(--top); }
+  .stunt-card .role-tag.role-base     { background: var(--base); }
+  .stunt-card .role-tag.role-spotter  { background: var(--spotter); color: #4a3500; }
+  .stunt-card .role-tag.role-backspot { background: var(--backspot); color: #043928; }
+  .stunt-card .role-tag.role-info     { background: #34406d; }
+  .stunt-card select {
+    flex: 1; background: #11162a; color: var(--text); border: 1px solid #34406d;
+    border-radius: 4px; font-size: 11px; padding: 3px 4px;
+    min-width: 0;
+  }
+  .stunt-card .removebtn {
+    background: transparent; border: 1px solid var(--ng); color: var(--ng);
+    border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 11px;
+  }
+  /* Stunt member badge on tokens */
+  .token.in-stunt::after {
+    content: attr(data-stunt-tag);
+    position: absolute; top: -3px; right: -3px;
+    background: var(--accent-3); color: #4a3500;
+    font-size: 8px; font-weight: 800;
+    padding: 1px 4px; border-radius: 6px;
+    border: 1.5px solid #fff;
+    pointer-events: none;
+    line-height: 1.2;
+  }
+
+  /* Scoring */
+  .rule {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--panel-2); border-radius: 8px;
+    padding: 6px 8px; font-size: 11px;
+  }
+  .rule .check {
+    width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 12px;
+  }
+  .rule.ok .check { background: var(--ok); color: #043928; }
+  .rule.ng .check { background: rgba(255,122,138,0.2); color: var(--ng); }
+  .rule .text { flex: 1; line-height: 1.3; }
+  .rule .pts { font-weight: 700; color: var(--accent-3); }
+  .total-pts {
+    background: linear-gradient(90deg, rgba(255,95,162,0.15), rgba(255,209,102,0.15));
+    border: 1px solid var(--accent-3); border-radius: 8px;
+    padding: 8px; text-align: center;
+  }
+  .total-pts .label { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .total-pts .num { font-size: 22px; font-weight: 800; color: var(--accent-3); }
+
+  /* Footer / Timeline */
+  footer {
+    background: var(--panel); border-top: 1px solid #2a3155;
+    padding: 8px 12px;
+  }
+  .timeline-top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px; gap: 6px; flex-wrap: wrap;
+  }
+  .count-display { font-size: 12px; color: var(--muted); }
+  .count-display b { color: var(--accent-2); font-size: 15px; }
+  .timeline { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+  .frame {
+    flex-shrink: 0; min-width: 100px;
+    background: var(--panel-2); border-radius: 8px; padding: 5px 8px;
+    cursor: pointer; border: 2px solid transparent;
+  }
+  .frame.active { border-color: var(--accent); background: #2a2147; }
+  .frame .frame-title { font-size: 12px; font-weight: 700; }
+  .frame .frame-meta { font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .frame .frame-actions { display: flex; gap: 3px; margin-top: 3px; }
+  .frame button {
+    flex: 1; font-size: 9px; padding: 2px;
+    background: #11162a; color: var(--muted); border: 1px solid #34406d;
+    border-radius: 4px; cursor: pointer;
+  }
+
+  /* Music panel */
+  .music-panel {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    background: var(--panel-2); border-radius: 8px; padding: 6px 8px;
+    margin-bottom: 6px; font-size: 12px;
+  }
+  .music-panel label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+  .music-panel input[type="number"] {
+    width: 56px; background: #11162a; color: var(--text);
+    border: 1px solid #34406d; border-radius: 4px; padding: 2px 4px;
+    font-size: 12px;
+  }
+  .music-panel .audio-name {
+    color: var(--accent-3); font-weight: 600;
+    max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .music-panel .time {
+    color: var(--accent-2); font-variant-numeric: tabular-nums; font-weight: 600;
+    margin-left: auto;
+  }
+  .waveform {
+    height: 10px; background: #11162a; border-radius: 4px; overflow: hidden;
+    flex: 1; min-width: 100px; position: relative; cursor: pointer;
+  }
+  .waveform .progress {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    width: 0%;
+    position: absolute; top: 0; left: 0; z-index: 2;
+    opacity: 0.55;
+  }
+  .waveform .loop-region {
+    position: absolute; top: 0; bottom: 0;
+    background: rgba(255,209,102,0.35);
+    border-left: 2px solid var(--accent-3);
+    border-right: 2px solid var(--accent-3);
+    z-index: 1; display: none;
+  }
+  .music-panel select {
+    background: #11162a; color: var(--text); border: 1px solid #34406d;
+    border-radius: 4px; padding: 2px 4px; font-size: 12px;
+  }
+  .music-panel .group {
+    display: inline-flex; gap: 2px; align-items: center;
+    background: #11162a; border-radius: 6px; padding: 2px;
+  }
+  .music-panel .group .btn { padding: 3px 6px; font-size: 11px; }
+  .loop-display {
+    font-size: 10px; color: var(--accent-3); font-variant-numeric: tabular-nums;
+    min-width: 76px;
+  }
+  .bpm-detect-btn { background: var(--accent-2); color: #062436; border-color: var(--accent-2); }
+  .bpm-detect-btn:disabled { opacity: 0.5; }
+
+  /* Help modal */
+  .help-modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 16px;
+  }
+  .help-modal.show { display: flex; }
+  .help-content {
+    background: var(--panel);
+    border: 2px solid var(--accent);
+    border-radius: 14px;
+    max-width: 560px;
+    width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+    padding: 18px 18px 24px;
+    position: relative;
+    color: var(--text);
+  }
+  .help-close {
+    position: absolute; top: 10px; right: 12px;
+    background: transparent; border: none;
+    color: var(--muted); font-size: 22px; cursor: pointer;
+    width: 32px; height: 32px;
+  }
+  .help-close:hover { color: var(--text); }
+  .help-content h2 {
+    color: var(--accent); margin: 0 0 14px; font-size: 17px;
+  }
+  .help-content h3 {
+    color: var(--accent-2); font-size: 13px;
+    margin: 14px 0 6px; padding-bottom: 4px;
+    border-bottom: 1px solid #34406d;
+  }
+  .help-item {
+    font-size: 13px; line-height: 1.7; color: var(--text);
+    padding: 2px 0;
+  }
+  .help-key {
+    display: inline-block;
+    background: var(--panel-2);
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-weight: 700;
+    color: var(--accent-3);
+    font-size: 12px;
+    margin: 0 2px;
+  }
+  .help-tip {
+    background: rgba(255,209,102,0.12);
+    border-left: 3px solid var(--accent-3);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-top: 8px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .hint {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); color: #fff;
+    padding: 8px 14px; border-radius: 18px; font-size: 12px;
+    pointer-events: none; opacity: 0; transition: opacity .3s; z-index: 100;
+  }
+  .hint.show { opacity: 1; }
+
+  .mobile-toggle, .mobile-only {
+    display: none;
+  }
+  @media (max-width: 820px) {
+    .mobile-toggle, .mobile-only { display: inline-flex; }
+  }
+
+  /* ============ Phone optimizations ============ */
+  @media (max-width: 720px) {
+    /* Header — compact */
+    header { padding: 6px 8px; gap: 4px; }
+    .title { font-size: 13px; }
+    .controls { gap: 3px; }
+    .controls .btn,
+    .controls .seg button { padding: 5px 7px; font-size: 11px; }
+    .controls .seg button { padding: 5px 6px; }
+
+    /* Hide count bar on phones — use scrub controls instead */
+    main { grid-template-columns: 1fr !important; gap: 6px; padding: 6px; }
+    .count-bar { display: none; }
+    .count-bar.show-mobile {
+      display: flex; position: fixed; left: 4px;
+      top: 50px; bottom: 80px; width: 78px;
+      z-index: 50; box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+    }
+
+    /* Floor: prioritize floor area */
+    .floor-wrap { padding: 6px; }
+    .floor-header { font-size: 10px; margin-bottom: 4px; }
+    .floor-header .frame-info { font-size: 11px; }
+
+    /* Token sizing handled by JS in fitFloor() — scales with floor width */
+
+    /* Member control — compact, horizontal scroll */
+    .member-control {
+      padding: 5px 6px; gap: 4px; font-size: 11px;
+      overflow-x: auto; flex-wrap: nowrap;
+    }
+    .mc-name { font-size: 12px; padding: 2px 6px; flex-shrink: 0; }
+    .mc-role-badge { font-size: 9px; flex-shrink: 0; }
+    .mc-row { flex-shrink: 0; }
+    .mc-label { font-size: 9px; }
+    .mc-btn { padding: 3px 6px; font-size: 10px; min-width: 26px; flex-shrink: 0; }
+    .mc-nudge { padding: 2px 6px; font-size: 13px; min-width: 26px; flex-shrink: 0; }
+    .mc-select { font-size: 10px; padding: 2px 3px; }
+
+    /* Music panel — collapse advanced */
+    .music-panel { padding: 5px 6px; gap: 5px; }
+    .music-panel.collapsed .music-advanced { display: none; }
+    .music-panel:not(.collapsed) .music-advanced {
+      display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
+      width: 100%;
+    }
+    .music-toggle-btn {
+      background: var(--panel-2); color: var(--accent-2);
+      border: 1px solid #34406d; border-radius: 6px;
+      padding: 3px 8px; font-size: 11px; cursor: pointer;
+    }
+    .music-panel input[type="number"] { width: 48px; font-size: 11px; }
+
+    /* Scrub controls — compact */
+    .scrub-controls { padding: 4px 5px; gap: 3px; margin-bottom: 4px; }
+    .scrub-controls .scrub-info { font-size: 10px; min-width: 80px; }
+    .scrub-controls .btn { padding: 4px 7px; font-size: 11px; }
+    .scrub-controls .step-btn { font-size: 13px; min-width: 30px; padding: 3px 6px; }
+
+    /* Timeline */
+    footer { padding: 5px 6px; }
+    .timeline-top { font-size: 11px; gap: 4px; }
+    .count-display { font-size: 10px; }
+    .count-display b { font-size: 13px; }
+    .frame { min-width: 80px; padding: 4px 6px; }
+    .frame .frame-title { font-size: 11px; }
+    .frame .frame-meta { font-size: 9px; }
+
+    /* Right panel as bottom sheet on mobile */
+    .right-panel.show-mobile {
+      position: fixed; left: 4px; right: 4px;
+      bottom: 4px; top: auto;
+      width: auto; max-height: 60vh;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+      border-radius: 14px 14px 8px 8px;
+    }
+  }
+  /* Tiny phones */
+  @media (max-width: 380px) {
+    .title span:not(.pom) { display: none; }
+    .controls .btn { padding: 4px 6px; font-size: 10px; }
+    .controls .seg button { padding: 4px 5px; font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="title"><span class="pom">★</span> Cheer Choreo <span style="color:var(--muted);font-size:11px;font-weight:400;">v2</span></div>
+    <div class="controls">
+      <div class="seg" id="matSeg">
+        <button data-mat="usa" class="on">USA (9)</button>
+        <button data-mat="jca">JCA (7)</button>
+      </div>
+      <div class="seg" id="viewSeg">
+        <button data-view="top" class="on">真上</button>
+        <button data-view="front">正面</button>
+      </div>
+      <button class="btn" id="addMember">＋メンバー</button>
+      <button class="btn" id="addFrame">＋隊形</button>
+      <button class="btn" id="presetBtn" title="フォーメーションのプリセット">📐 配置</button>
+      <button class="btn primary" id="playBtn">▶ 再生</button>
+      <button class="btn" id="shareBtn" title="LINEで共有">📤 共有</button>
+      <button class="btn" id="helpBtn" title="使い方ガイド">❓ ヘルプ</button>
+      <button class="btn mobile-toggle" id="togglePanel">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT: count bar -->
+    <aside class="count-bar" id="countBar">
+      <h3>COUNT</h3>
+    </aside>
+
+    <!-- CENTER: floor -->
+    <div class="floor-wrap">
+      <div class="floor-header">
+        <span id="matModeLabel">USA 9マット</span>
+        <span class="frame-info" id="frameInfo">隊形 1 / 1</span>
+      </div>
+      <div class="member-control" id="memberControl"></div>
+      <div class="floor-outer">
+        <div class="floor" id="floor">
+          <div class="scrub-banner">🎯 確認モード — 編集するには「✕ 終了」</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: roster + stunts + scoring -->
+    <aside class="right-panel" id="rightPanel">
+      <div class="panel-tabs">
+        <button data-tab="members" class="on">メンバー</button>
+        <button data-tab="stunts">スタンツ</button>
+        <button data-tab="score">採点</button>
+      </div>
+      <div class="panel-section on" data-section="members">
+        <h4>メンバー（タップで編集）</h4>
+        <div id="rosterList" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+      <div class="panel-section" data-section="stunts">
+        <h4>この隊形のスタンツ</h4>
+        <div id="stuntList" style="display:flex;flex-direction:column;gap:5px"></div>
+        <button class="btn" id="addStunt" style="margin-top:6px">＋ スタンツを追加</button>
+        <div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:4px;">
+          スタンツは「トップ＋ベース／スポッター／バックスポット」で構成します。
+          フロアのトップを選んでから追加してください。
+        </div>
+      </div>
+      <div class="panel-section" data-section="score">
+        <h4>構成条件チェック（演技全体）</h4>
+        <div id="ruleList" style="display:flex;flex-direction:column;gap:5px"></div>
+        <h4 style="margin-top:8px">技構成サマリー</h4>
+        <div id="summaryList" style="font-size:11px;color:var(--text);background:var(--panel-2);border-radius:8px;padding:6px 8px;line-height:1.7"></div>
+        <div class="total-pts" id="totalPts" style="margin-top:8px">
+          <div class="label">推定 EXTRA POINTS</div>
+          <div class="num">0.0</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:6px">
+          ※ 採点ルールはデモ用の簡易ロジックです。実際のJCA/USA規定とは一致しません。
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div class="music-panel collapsed" id="musicPanel">
+      <button class="btn" id="loadAudio">🎵 音源</button>
+      <input type="file" id="audioFile" accept="audio/*" style="display:none" />
+      <span class="audio-name" id="audioName">未選択</span>
+      <label>BPM<input type="number" id="bpmInput" value="120" min="40" max="240" step="1" /></label>
+      <div class="waveform" id="waveform">
+        <div class="loop-region" id="loopRegion"></div>
+        <div class="progress" id="audioProgress"></div>
+      </div>
+      <span class="time" id="audioTime">0:00 / 0:00</span>
+      <button class="music-toggle-btn mobile-only" id="musicMore">⚙ 詳細</button>
+      <button class="btn bpm-detect-btn music-advanced" id="detectBpm" title="音源を解析してBPMを推定">BPM自動</button>
+      <label class="music-advanced">速度
+        <select id="rateInput">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1.0x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+        </select>
+      </label>
+      <label class="music-advanced">開始<input type="number" id="offsetInput" value="0" min="0" step="0.1" />s</label>
+      <div class="group music-advanced" title="サビなど一部区間をループ再生">
+        <button class="btn" id="loopIn">⤴IN</button>
+        <button class="btn" id="loopOut">⤵OUT</button>
+        <span class="loop-display" id="loopDisplay">- / -</span>
+        <button class="btn" id="loopClear" title="ループ区間をクリア">×</button>
+      </div>
+      <label class="music-advanced"><input type="checkbox" id="loopWholeInput" /> 全曲ループ</label>
+      <audio id="audio" preload="auto"></audio>
+    </div>
+    <div class="scrub-controls">
+      <button class="btn undo-btn" id="undoBtn" title="1つ前に戻る" disabled>↩</button>
+      <button class="btn redo-btn" id="redoBtn" title="やり直し" disabled>↪</button>
+      <button class="btn step-btn" id="prevCountBtn" title="前のカウント">◀</button>
+      <button class="btn step-btn" id="nextCountBtn" title="次のカウント">▶</button>
+      <span class="scrub-info idle" id="scrubInfo">◀▶で1カウントずつ確認モードに入る</span>
+      <button class="btn split-btn" id="splitBtn" title="この位置で隊形を分割" style="display:none">✂ ここで分割</button>
+      <button class="btn exit-btn" id="exitScrubBtn" title="編集モードに戻る" style="display:none">✕ 終了</button>
+    </div>
+    <div class="timeline-top">
+      <span class="count-display">カウント <b id="countNow">1</b> / <span id="countTotal">8</span> 　♪ <span id="frameCount">0</span> 隊形</span>
+      <button class="btn ghost" id="resetBtn">リセット</button>
+    </div>
+    <div class="timeline" id="timeline"></div>
+  </footer>
+</div>
+
+<div class="hint" id="hint">ヒント</div>
+<div class="save-toast" id="saveToast">✓ 記録しました</div>
+
+<!-- Preset menu -->
+<div class="preset-overlay" id="presetOverlay"></div>
+<div class="preset-menu" id="presetMenu">
+  <div class="preset-title">📐 配置プリセット</div>
+  <button data-preset="line"><span class="preset-icon">━</span>横一列</button>
+  <button data-preset="twoRows"><span class="preset-icon">═</span>二列（前後）</button>
+  <button data-preset="vShape"><span class="preset-icon">∨</span>V字</button>
+  <button data-preset="invertedV"><span class="preset-icon">∧</span>逆V字</button>
+  <button data-preset="diamond"><span class="preset-icon">◆</span>ダイヤモンド</button>
+  <button data-preset="circle"><span class="preset-icon">○</span>円形</button>
+  <button data-preset="triangle"><span class="preset-icon">▲</span>三角形</button>
+  <button data-preset="grid"><span class="preset-icon">▦</span>グリッド</button>
+</div>
+
+<!-- Help modal -->
+<div class="help-modal" id="helpModal">
+  <div class="help-content">
+    <button class="help-close" id="helpClose" aria-label="閉じる">×</button>
+    <h2>📘 Cheer Choreo 使い方ガイド</h2>
+
+    <h3>🎵 音源を入れる</h3>
+    <div class="help-item"><span class="help-key">🎵 音源</span> をタップ → 端末から音楽ファイル（mp3など）を選ぶ</div>
+    <div class="help-item"><span class="help-key">BPM</span> を曲のテンポに合わせて入力（自動検出は「⚙ 詳細」から）</div>
+
+    <h3>👤 人の位置を変える（3通り）</h3>
+    <div class="help-item">① <b>ドラッグ</b>：人を<span class="help-key">指で押さえて動かす</span></div>
+    <div class="help-item">② <b>タップ移動</b>：人をタップ → <span class="help-key">📍 タップで移動</span> → 行き先をタップ</div>
+    <div class="help-item">③ <b>微調整</b>：人をタップ → <span class="help-key">← ↑ → ↓</span> ボタンで2%ずつ動かす</div>
+
+    <h3>⬆️ 高さを変える（地上 / 肩 / エクステンション）</h3>
+    <div class="help-item">人をタップ → 操作カードの <span class="help-key">地上</span> <span class="help-key">肩</span> <span class="help-key">エクステンション</span> ボタン</div>
+    <div class="help-item">または人を <b>ダブルタップ</b> で順番に切り替え</div>
+
+    <h3>🤸 役割を変える（ベース・トップ・スポッター・バックスポット）</h3>
+    <div class="help-item">人をタップ → 操作カードの <span class="help-key">役割</span> ドロップダウン</div>
+
+    <h3>🏗 スタンツを組む</h3>
+    <div class="help-item">1. ベース役を2人以上、トップ役を1人以上用意</div>
+    <div class="help-item">2. <b>トップ役の人をタップ</b> → 操作カードの <span class="help-key">＋ スタンツ作成</span></div>
+    <div class="help-item">3. 自動でベース2人＋スポッター＋バックスポットが割り当てられる</div>
+    <div class="help-item">4. 微調整は「⚙ → スタンツタブ」で各役割をドロップダウンから選び直し</div>
+    <div class="help-item">5. ボディポジション（リバティ・ヒールストレッチ等）も同タブで設定</div>
+    <div class="help-tip">💡 スタンツ参加メンバーには 黄色いバッジ（T/B/Sp/Bk）が表示されます</div>
+
+    <h3>🔗 スタンツのまま移動</h3>
+    <div class="help-item">スタンツ参加メンバーをタップ → <span class="help-key">🔗 連動移動 ON</span></div>
+    <div class="help-item">そのままドラッグ → スタンツのメンバー全員が一緒に動く</div>
+    <div class="help-tip">💡 例：トップを動かす → ベース2人＋スポッターも追従</div>
+
+    <h3>🎬 隊形の切替・追加</h3>
+    <div class="help-item">切替：画面下のタイムラインの <span class="help-key">隊形カード</span> をタップ</div>
+    <div class="help-item">追加：ヘッダーの <span class="help-key">+ 隊形</span>（現在の隊形がコピーされる）</div>
+
+    <h3>⏯ 1カウントずつ確認・編集</h3>
+    <div class="help-item"><span class="help-key">◀ ▶</span> で1カウントずつ進める／戻す</div>
+    <div class="help-item">任意のカウント位置で <span class="help-key">✂ ここで分割</span> → 中間の隊形を作成</div>
+    <div class="help-item">スクラブを抜けるには <span class="help-key">終了</span> または タイムラインの隊形をタップ</div>
+
+    <h3>▶️ 再生</h3>
+    <div class="help-item">ヘッダーの <span class="help-key">▶ 再生</span> → 隊形遷移と音源を同期再生</div>
+    <div class="help-item">速度・ループは「⚙ 詳細」を開いて設定</div>
+
+    <h3>👁 ビュー切替</h3>
+    <div class="help-item"><span class="help-key">真上</span>：マット上の配置を確認・編集</div>
+    <div class="help-item"><span class="help-key">正面</span>：観客から見た人型・スタンツポーズを確認</div>
+
+    <h3>🏟 マット規格</h3>
+    <div class="help-item"><span class="help-key">USA(9)</span>：9マット（5本目が中央）</div>
+    <div class="help-item"><span class="help-key">JCA(7)</span>：7マット（4本目が中央）</div>
+
+    <h3>📤 共有・配布</h3>
+    <div class="help-item">ヘッダーの <span class="help-key">📤 共有</span> → LINEなどで現在のURLを共有</div>
+
+    <h3>❓ 困った時</h3>
+    <div class="help-item">人が動かない → 画面を一度<b>再読み込み</b>（更新ボタン）</div>
+    <div class="help-item">操作カードが画面を圧迫 → カードの <span class="help-key">✕ 解除</span></div>
+    <div class="help-item">スクラブから戻る → <span class="help-key">終了</span> ボタン</div>
+    <div class="help-item">音源が再生されない → 画面を一度タップしてから ▶ 再生（iOS制限）</div>
+
+    <div class="help-tip" style="margin-top:16px">
+      ⚠️ <b>β版の注意</b>：編集内容はリロードで消えます。本番投入前は動画録画・スクショで残してください。
+    </div>
+  </div>
+</div>
+
+<script>
+/* ======== Constants ======== */
+const MAT_CONFIGS = {
+  usa: { count: 9, centerIdx: 4, label: "USA 9マット" },  // 5本目=index4
+  jca: { count: 7, centerIdx: 3, label: "JCA 7マット" },  // 4本目=index3
+};
+const MAT_W_CM = 183;
+const MAT_H_CM = 1260;
+
+const ROLES = {
+  base:     { label: "ベース",       color: "var(--base)",     short: "BASE" },
+  top:      { label: "トップ",       color: "var(--top)",      short: "TOP"  },
+  spotter:  { label: "スポッター",   color: "var(--spotter)",  short: "SPOT" },
+  backspot: { label: "バックスポット", color: "var(--backspot)", short: "BACK" },
+};
+
+// Body positions for tops at non-ground level
+const BODY_POSITIONS = {
+  basic:        { label: "ベーシック",     pts: 0,    diff: 1 },
+  liberty:      { label: "リバティ",       pts: 0.3,  diff: 2 },
+  heelStretch:  { label: "ヒールストレッチ", pts: 0.5, diff: 3 },
+  arabesque:    { label: "アラベスク",     pts: 0.5,  diff: 3 },
+  scorpion:     { label: "スコーピオン",   pts: 0.7,  diff: 4 },
+  bowAndArrow:  { label: "ボウ＆アロー",   pts: 0.8,  diff: 5 },
+};
+
+const STUNT_TYPES = {
+  prep:        { label: "プレップ",         level: "shoulder",  baseCount: 2, diff: 1 },
+  shoulderSit: { label: "ショルダーシット", level: "shoulder",  baseCount: 1, diff: 1 },
+  shoulderStand:{label: "ショルダースタンド",level: "shoulder",  baseCount: 1, diff: 2 },
+  extension:   { label: "エクステンション", level: "extension", baseCount: 2, diff: 3 },
+  liberty:     { label: "リバティ",         level: "extension", baseCount: 2, diff: 4 },
+  halfUp:      { label: "ハーフアップ",     level: "extension", baseCount: 2, diff: 4 },
+  fullUp:      { label: "フルアップ",       level: "extension", baseCount: 2, diff: 6 },
+};
+
+// Demo scoring rules (mock)
+const RULES = [
+  {
+    name: "レベル1 エリートクリア",
+    detail: "エクステンション系が2基以上",
+    pts: 1.0,
+    check: (s) => s.extensionTotal >= 2,
+  },
+  {
+    name: "レベル2 エリートクリア",
+    detail: "エクステンション3基 or リバティ2基以上",
+    pts: 1.5,
+    check: (s) => s.extensionTotal >= 3 || s.byType.liberty >= 2,
+  },
+  {
+    name: "レベル3 エリートクリア",
+    detail: "リバティ2基＋ハーフ/フルアップ1基以上",
+    pts: 2.0,
+    check: (s) => s.byType.liberty >= 2 && (s.byType.halfUp + s.byType.fullUp) >= 1,
+  },
+  {
+    name: "高難度ボディポジション加点",
+    detail: "ヒールストレッチ／アラベスク等 1つ以上",
+    pts: 0.5,
+    check: (s) => s.bodyPosCount.heelStretch + s.bodyPosCount.arabesque >= 1,
+  },
+  {
+    name: "最高難度ボディポジション加点",
+    detail: "スコーピオン／ボウ＆アロー 1つ以上",
+    pts: 0.7,
+    check: (s) => s.bodyPosCount.scorpion + s.bodyPosCount.bowAndArrow >= 1,
+  },
+  {
+    name: "オールガールズ・スタンツ要件",
+    detail: "肩〜エクステンション帯のスタンツ計4基以上",
+    pts: 1.0,
+    check: (s) => s.shoulderTotal + s.extensionTotal >= 4,
+  },
+  {
+    name: "フォーメーション多様性",
+    detail: "隊形数3つ以上",
+    pts: 0.5,
+    check: (s) => s.frameCount >= 3,
+  },
+];
+
+let bpm = 120;
+let audioOffset = 0;
+let playbackRate = 1.0;
+let loopStart = null;
+let loopEnd = null;
+const countDuration = () => (60000 / bpm) / playbackRate;
+
+/* ======== State ======== */
+let memberIdSeq = 1;
+let frameIdSeq = 1;
+let stuntIdSeq = 1;
+
+let matMode = "usa";
+let viewMode = "top"; // "top" or "front"
+
+let members = [
+  { id: memberIdSeq++, name: "ユウカ",   role: "top" },
+  { id: memberIdSeq++, name: "ハルカ",   role: "top" },
+  { id: memberIdSeq++, name: "ミサキ",   role: "base" },
+  { id: memberIdSeq++, name: "アヤ",     role: "base" },
+  { id: memberIdSeq++, name: "リン",     role: "base" },
+  { id: memberIdSeq++, name: "サクラ",   role: "base" },
+  { id: memberIdSeq++, name: "ナナミ",   role: "spotter" },
+  { id: memberIdSeq++, name: "モモ",     role: "backspot" },
+];
+
+// frame: { id, name, counts, positions, stunts }
+// positions: { memberId: { x, y, level, bodyPos } } where x,y normalized 0-1
+// stunts: [{ id, type, topId, baseIds[], spotterId, backspotId }]
+let frames = [
+  {
+    id: frameIdSeq++, name: "オープニング", counts: 8,
+    positions: {
+      1: { x: 0.50, y: 0.55, level: "ground", bodyPos: "basic" },
+      2: { x: 0.30, y: 0.65, level: "ground", bodyPos: "basic" },
+      3: { x: 0.70, y: 0.65, level: "ground", bodyPos: "basic" },
+      4: { x: 0.20, y: 0.45, level: "ground", bodyPos: "basic" },
+      5: { x: 0.80, y: 0.45, level: "ground", bodyPos: "basic" },
+      6: { x: 0.35, y: 0.30, level: "ground", bodyPos: "basic" },
+      7: { x: 0.65, y: 0.30, level: "ground", bodyPos: "basic" },
+      8: { x: 0.50, y: 0.20, level: "ground", bodyPos: "basic" },
+    },
+    stunts: [],
+  },
+  {
+    id: frameIdSeq++, name: "スタンツ立ち上げ", counts: 8,
+    positions: {
+      1: { x: 0.30, y: 0.50, level: "extension", bodyPos: "liberty" },
+      2: { x: 0.70, y: 0.50, level: "extension", bodyPos: "heelStretch" },
+      3: { x: 0.27, y: 0.55, level: "ground", bodyPos: "basic" },
+      4: { x: 0.33, y: 0.55, level: "ground", bodyPos: "basic" },
+      5: { x: 0.67, y: 0.55, level: "ground", bodyPos: "basic" },
+      6: { x: 0.73, y: 0.55, level: "ground", bodyPos: "basic" },
+      7: { x: 0.30, y: 0.65, level: "ground", bodyPos: "basic" },
+      8: { x: 0.70, y: 0.65, level: "ground", bodyPos: "basic" },
+    },
+    stunts: [
+      { id: stuntIdSeq++, type: "liberty",    topId: 1, baseIds: [3, 4], spotterId: 7,  backspotId: null },
+      { id: stuntIdSeq++, type: "extension",  topId: 2, baseIds: [5, 6], spotterId: 8,  backspotId: null },
+    ],
+  },
+  {
+    id: frameIdSeq++, name: "ライン展開", counts: 8,
+    positions: {
+      1: { x: 0.50, y: 0.50, level: "ground", bodyPos: "basic" },
+      2: { x: 0.20, y: 0.50, level: "ground", bodyPos: "basic" },
+      3: { x: 0.35, y: 0.50, level: "ground", bodyPos: "basic" },
+      4: { x: 0.65, y: 0.50, level: "ground", bodyPos: "basic" },
+      5: { x: 0.80, y: 0.50, level: "ground", bodyPos: "basic" },
+      6: { x: 0.10, y: 0.50, level: "ground", bodyPos: "basic" },
+      7: { x: 0.90, y: 0.50, level: "ground", bodyPos: "basic" },
+      8: { x: 0.50, y: 0.30, level: "ground", bodyPos: "basic" },
+    },
+    stunts: [],
+  },
+];
+
+let currentFrameIdx = 0;
+let selectedMemberId = null;
+let isPlaying = false;
+let playState = { frameIdx: 0, count: 1 };
+let scrubMode = false;
+let scrubGlobalCount = 1;
+let tapToMoveActive = false;
+let groupMoveActive = true; // when in stunt, move whole stunt as a group
+
+/* ======== Undo/Redo system ======== */
+let history = [];
+let historyIdx = -1;
+const MAX_HISTORY = 50;
+function snapshot(label) {
+  // Truncate any redo entries
+  history = history.slice(0, historyIdx + 1);
+  history.push({
+    frames: JSON.parse(JSON.stringify(frames)),
+    currentFrameIdx,
+    members: JSON.parse(JSON.stringify(members)),
+    label: label || "編集",
+  });
+  if (history.length > MAX_HISTORY) history.shift();
+  historyIdx = history.length - 1;
+  updateUndoRedoButtons();
+  flashSavedIndicator(label);
+}
+function applyHistoryAt(idx) {
+  const snap = history[idx];
+  if (!snap) return;
+  frames = JSON.parse(JSON.stringify(snap.frames));
+  members = JSON.parse(JSON.stringify(snap.members));
+  currentFrameIdx = snap.currentFrameIdx;
+  if (currentFrameIdx >= frames.length) currentFrameIdx = frames.length - 1;
+  selectedMemberId = null;
+  tapToMoveActive = false;
+  scrubMode = false;
+  renderAll();
+  updateUndoRedoButtons();
+}
+function undoAction() {
+  if (historyIdx <= 0) { showHint("これ以上戻れません"); return; }
+  historyIdx--;
+  applyHistoryAt(historyIdx);
+  showHint("↩ 1つ戻りました");
+}
+function redoAction() {
+  if (historyIdx >= history.length - 1) { showHint("これ以上進めません"); return; }
+  historyIdx++;
+  applyHistoryAt(historyIdx);
+  showHint("↪ やり直し");
+}
+function updateUndoRedoButtons() {
+  const u = document.getElementById("undoBtn");
+  const r = document.getElementById("redoBtn");
+  if (u) u.disabled = (historyIdx <= 0);
+  if (r) r.disabled = (historyIdx >= history.length - 1);
+}
+function flashSavedIndicator(label) {
+  const el = document.getElementById("saveToast");
+  if (!el) return;
+  el.textContent = "✓ " + (label || "記録しました");
+  el.classList.add("show");
+  clearTimeout(flashSavedIndicator._t);
+  flashSavedIndicator._t = setTimeout(() => el.classList.remove("show"), 1400);
+}
+
+/* ======== DOM ======== */
+const floor = document.getElementById("floor");
+const rosterList = document.getElementById("rosterList");
+const stuntList = document.getElementById("stuntList");
+const ruleList = document.getElementById("ruleList");
+const summaryList = document.getElementById("summaryList");
+const timeline = document.getElementById("timeline");
+const countBar = document.getElementById("countBar");
+const frameInfo = document.getElementById("frameInfo");
+const countNowEl = document.getElementById("countNow");
+const countTotalEl = document.getElementById("countTotal");
+const frameCountEl = document.getElementById("frameCount");
+const matModeLabel = document.getElementById("matModeLabel");
+const totalPtsEl = document.getElementById("totalPts");
+const hintEl = document.getElementById("hint");
+
+function showHint(msg) {
+  hintEl.textContent = msg;
+  hintEl.classList.add("show");
+  clearTimeout(showHint._t);
+  showHint._t = setTimeout(() => hintEl.classList.remove("show"), 1800);
+}
+
+/* ======== Scrub helpers ======== */
+function totalCounts() {
+  return frames.reduce((s, f) => s + f.counts, 0);
+}
+function findFrameAtGlobalCount(gc) {
+  // gc is 1-based; returns { frameIdx, localCount, progress }
+  let remaining = Math.max(1, gc);
+  for (let i = 0; i < frames.length; i++) {
+    if (remaining <= frames[i].counts) {
+      return { frameIdx: i, localCount: remaining, progress: remaining / frames[i].counts };
+    }
+    remaining -= frames[i].counts;
+  }
+  const last = frames.length - 1;
+  return { frameIdx: last, localCount: frames[last].counts, progress: 1 };
+}
+function globalCountForFrame(frameIdx, localCount) {
+  let g = 0;
+  for (let i = 0; i < frameIdx; i++) g += frames[i].counts;
+  return g + localCount;
+}
+function getInterpolatedPositions(globalCount) {
+  const { frameIdx, progress } = findFrameAtGlobalCount(globalCount);
+  if (frameIdx === 0) return frames[0].positions;
+  const prev = frames[frameIdx - 1];
+  const cur = frames[frameIdx];
+  const result = {};
+  members.forEach(m => {
+    const pp = prev.positions[m.id];
+    const cp = cur.positions[m.id];
+    if (!pp || !cp) { result[m.id] = cp || pp; return; }
+    result[m.id] = {
+      x: pp.x + (cp.x - pp.x) * progress,
+      y: pp.y + (cp.y - pp.y) * progress,
+      level: progress >= 0.5 ? cp.level : pp.level,
+      bodyPos: progress >= 0.5 ? cp.bodyPos : pp.bodyPos,
+    };
+  });
+  return result;
+}
+function getActiveStunts() {
+  // For scrubbing, use stunts of the destination frame
+  const { frameIdx } = findFrameAtGlobalCount(scrubGlobalCount);
+  return frames[frameIdx].stunts;
+}
+
+/* ======== Floor sizing (preserve aspect ratio) ======== */
+let figureHeight = 76; // dynamically computed in fitFloor for front view
+function fitFloor() {
+  const cfg = MAT_CONFIGS[matMode];
+  // Top view = realistic mat aspect; Front view taller to fit extension stunts
+  const aspect = viewMode === "top"
+    ? (cfg.count * MAT_W_CM) / MAT_H_CM
+    : (cfg.count * MAT_W_CM) / (MAT_H_CM * 1.05);
+  const wrap = floor.parentElement;
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  let w, h;
+  if (W / H > aspect) {
+    h = H; w = h * aspect;
+  } else {
+    w = W; h = w / aspect;
+  }
+  floor.style.width = w + "px";
+  floor.style.height = h + "px";
+  // Dynamically size tokens (top view circles)
+  const tokenSize = Math.max(26, Math.min(48, w * 0.075));
+  floor.style.setProperty("--token-size", tokenSize + "px");
+  // Dynamically size figures (front view human silhouettes)
+  figureHeight = Math.max(46, Math.min(76, w * 0.13));
+}
+
+/* ======== Scene rendering (top vs front) ======== */
+function renderScene() {
+  if (viewMode === "top") {
+    floor.classList.remove("front-view");
+    renderMat();
+  } else {
+    floor.classList.add("front-view");
+    renderMatFront();
+  }
+}
+
+function renderMatFront() {
+  // Clear all dynamic elements
+  floor.querySelectorAll(".mat-strip,.center-h-line,.center-cross,.mat-num,.audience-label,.judges-label,.horizon-line,.center-cross-fv,.front-mat-svg,.fv-mat-num,.fv-cc-label").forEach(e => e.remove());
+
+  const cfg = MAT_CONFIGS[matMode];
+  const N = cfg.count;
+  const cIdx = cfg.centerIdx;
+
+  // SVG with perspective mat lines (stretched to floor size)
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "front-mat-svg");
+  svg.setAttribute("viewBox", "0 0 1000 1000");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;";
+
+  const horizonY = 500; // 50% from top
+  const bottomY  = 1000;
+  // Vanishing-point compression: at horizon the mat appears narrower
+  const vpL = 320; // x at horizon for the leftmost edge
+  const vpR = 680; // x at horizon for the rightmost edge
+
+  // 1) Stage trapezoid background (subtle floor color)
+  const stage = document.createElementNS(svgNS, "polygon");
+  stage.setAttribute("points", `${vpL},${horizonY} ${vpR},${horizonY} 1000,${bottomY} 0,${bottomY}`);
+  stage.setAttribute("fill", "rgba(245,236,211,0.55)");
+  svg.appendChild(stage);
+
+  // 2) Center mat highlight
+  const tcL = vpL + (cIdx / N) * (vpR - vpL);
+  const tcR = vpL + ((cIdx + 1) / N) * (vpR - vpL);
+  const bcL = (cIdx / N) * 1000;
+  const bcR = ((cIdx + 1) / N) * 1000;
+  const center = document.createElementNS(svgNS, "polygon");
+  center.setAttribute("points", `${tcL},${horizonY} ${tcR},${horizonY} ${bcR},${bottomY} ${bcL},${bottomY}`);
+  center.setAttribute("fill", "rgba(255,245,216,0.9)");
+  svg.appendChild(center);
+
+  // 3) Boundary lines (mat dividers, with perspective convergence)
+  for (let i = 0; i <= N; i++) {
+    const bX = (i / N) * 1000;
+    const tX = vpL + (i / N) * (vpR - vpL);
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", tX); line.setAttribute("y1", horizonY);
+    line.setAttribute("x2", bX); line.setAttribute("y2", bottomY);
+    line.setAttribute("stroke", "#6a5a32");
+    line.setAttribute("stroke-width", (i === 0 || i === N) ? "2.5" : "1.2");
+    line.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(line);
+  }
+
+  // 4) Horizon line
+  const hl = document.createElementNS(svgNS, "line");
+  hl.setAttribute("x1", vpL); hl.setAttribute("y1", horizonY);
+  hl.setAttribute("x2", vpR); hl.setAttribute("y2", horizonY);
+  hl.setAttribute("stroke", "#6a5a32");
+  hl.setAttribute("stroke-width", "2");
+  hl.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(hl);
+
+  // 5) Mid-depth line (where C×C lives, helpful guide)
+  const midDepth = 0.5; // 50% along stage
+  const midY = horizonY + (bottomY - horizonY) * midDepth;
+  const midL = vpL + (1 - midDepth) * (0 - vpL);
+  const midR = vpR + (1 - midDepth) * (1000 - vpR);
+  // simpler: linearly interpolate edges from horizon to bottom
+  const midLeftX  = vpL + midDepth * (0 - vpL);
+  const midRightX = vpR + midDepth * (1000 - vpR);
+  const ml = document.createElementNS(svgNS, "line");
+  ml.setAttribute("x1", midLeftX); ml.setAttribute("y1", midY);
+  ml.setAttribute("x2", midRightX); ml.setAttribute("y2", midY);
+  ml.setAttribute("stroke", "#c9332e");
+  ml.setAttribute("stroke-width", "1.5");
+  ml.setAttribute("stroke-dasharray", "5 4");
+  ml.setAttribute("opacity", "0.6");
+  ml.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(ml);
+
+  // 6) C×C exact-center marker (cross at geometric center of mat)
+  const ccX = 500, ccY = midY;
+  const cross1 = document.createElementNS(svgNS, "line");
+  cross1.setAttribute("x1", ccX - 12); cross1.setAttribute("y1", ccY);
+  cross1.setAttribute("x2", ccX + 12); cross1.setAttribute("y2", ccY);
+  cross1.setAttribute("stroke", "#c9332e"); cross1.setAttribute("stroke-width", "3");
+  cross1.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(cross1);
+  const cross2 = document.createElementNS(svgNS, "line");
+  cross2.setAttribute("x1", ccX); cross2.setAttribute("y1", ccY - 12);
+  cross2.setAttribute("x2", ccX); cross2.setAttribute("y2", ccY + 12);
+  cross2.setAttribute("stroke", "#c9332e"); cross2.setAttribute("stroke-width", "3");
+  cross2.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(cross2);
+
+  floor.appendChild(svg);
+
+  // Mat numbers as HTML (avoid SVG aspect distortion)
+  for (let i = 0; i < N; i++) {
+    const div = document.createElement("div");
+    div.className = "fv-mat-num";
+    div.textContent = (i + 1);
+    div.style.cssText = `position:absolute;bottom:1.5%;left:${((i+0.5)/N)*100}%;transform:translateX(-50%);font-size:10px;font-weight:700;color:#6a5a32;pointer-events:none;z-index:2;`;
+    if (i === cIdx) div.style.color = "#c9332e";
+    floor.appendChild(div);
+  }
+  // C×C label (HTML)
+  const ccLabel = document.createElement("div");
+  ccLabel.className = "fv-cc-label";
+  ccLabel.textContent = "CENTER × CENTER";
+  ccLabel.style.cssText = `position:absolute;top:74%;left:50%;transform:translate(-50%, -100%);font-size:9px;font-weight:800;color:#c9332e;background:rgba(255,255,255,0.9);padding:1px 5px;border-radius:4px;pointer-events:none;z-index:2;letter-spacing:0.5px;`;
+  floor.appendChild(ccLabel);
+
+  matModeLabel.textContent = cfg.label + " ／ 正面ビュー（観客席から） ／ 中央マット ＝ " + (cIdx + 1) + " 本目";
+}
+
+function renderMat() {
+  // Clear ALL static elements (both top-view and front-view leftovers) — keep tokens
+  floor.querySelectorAll(".mat-strip,.center-h-line,.center-cross,.mat-num,.audience-label,.judges-label,.horizon-line,.center-cross-fv,.front-mat-svg,.fv-mat-num,.fv-cc-label").forEach(e => e.remove());
+  const cfg = MAT_CONFIGS[matMode];
+  const stripPct = 100 / cfg.count;
+  for (let i = 0; i < cfg.count; i++) {
+    const s = document.createElement("div");
+    s.className = "mat-strip" + (i === cfg.centerIdx ? " center-mat" : "");
+    s.style.left = (i * stripPct) + "%";
+    s.style.width = stripPct + "%";
+    floor.appendChild(s);
+    // mat number at top
+    const num = document.createElement("div");
+    num.className = "mat-num";
+    num.style.left = ((i + 0.5) * stripPct) + "%";
+    num.textContent = (i + 1);
+    floor.appendChild(num);
+  }
+  // center horizontal line
+  const ch = document.createElement("div");
+  ch.className = "center-h-line";
+  floor.appendChild(ch);
+  // center×center cross
+  const cc = document.createElement("div");
+  cc.className = "center-cross";
+  cc.innerHTML = `<div class="ring"></div><div class="label">CENTER × CENTER</div>`;
+  floor.appendChild(cc);
+  // labels
+  const aud = document.createElement("div");
+  aud.className = "audience-label";
+  aud.textContent = "A U D I E N C E";
+  floor.appendChild(aud);
+  const jud = document.createElement("div");
+  jud.className = "judges-label";
+  jud.textContent = "← JUDGES";
+  floor.appendChild(jud);
+
+  matModeLabel.textContent = cfg.label + " （実寸 " + (cfg.count * MAT_W_CM / 100).toFixed(2) + "m × " + (MAT_H_CM/100) + "m）";
+}
+
+/* ======== Roster ======== */
+function renderRoster() {
+  rosterList.innerHTML = "";
+  members.forEach(m => {
+    const row = document.createElement("div");
+    row.className = "roster-item";
+    row.innerHTML = `
+      <span class="role-dot" style="background:${ROLES[m.role].color}"></span>
+      <input class="name-input" value="${m.name}" data-id="${m.id}" />
+      <select data-id="${m.id}" class="role-select">
+        ${Object.entries(ROLES).map(([k, v]) =>
+          `<option value="${k}" ${k===m.role?"selected":""}>${v.label}</option>`
+        ).join("")}
+      </select>
+      <button class="del" data-id="${m.id}" title="削除">×</button>
+    `;
+    rosterList.appendChild(row);
+  });
+  rosterList.querySelectorAll(".name-input").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const id = +e.target.dataset.id;
+      const m = members.find(x => x.id === id);
+      if (m) { m.name = e.target.value; renderTokens(); }
+    });
+  });
+  rosterList.querySelectorAll(".role-select").forEach(sel => {
+    sel.addEventListener("change", e => {
+      const id = +e.target.dataset.id;
+      const m = members.find(x => x.id === id);
+      if (m) { m.role = e.target.value; renderRoster(); renderTokens(); snapshot("役割変更"); }
+    });
+  });
+  rosterList.querySelectorAll(".del").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const id = +e.target.dataset.id;
+      members = members.filter(x => x.id !== id);
+      frames.forEach(f => {
+        delete f.positions[id];
+        f.stunts = f.stunts.filter(s => s.topId !== id && !s.baseIds.includes(id) && s.spotterId !== id && s.backspotId !== id);
+      });
+      renderRoster(); renderTokens(); renderStunts(); renderScore();
+      snapshot("メンバー削除");
+    });
+  });
+}
+
+/* ======== Tokens (members on floor) ======== */
+function getDisplayFrame() {
+  if (scrubMode) {
+    const { frameIdx } = findFrameAtGlobalCount(scrubGlobalCount);
+    return {
+      name: frames[frameIdx].name,
+      counts: frames[frameIdx].counts,
+      positions: getInterpolatedPositions(scrubGlobalCount),
+      stunts: frames[frameIdx].stunts,
+      _scrub: true,
+      _scrubFrameIdx: frameIdx,
+    };
+  }
+  return frames[currentFrameIdx];
+}
+function renderTokens() {
+  floor.querySelectorAll(".token, .figure").forEach(t => t.remove());
+  const realFrame = frames[currentFrameIdx];
+  if (!realFrame) return;
+  // Ensure positions exist for all members in the real frame
+  members.forEach(m => {
+    if (!realFrame.positions[m.id]) {
+      realFrame.positions[m.id] = { x: 0.5 + (Math.random() - 0.5) * 0.6, y: 0.5 + (Math.random() - 0.5) * 0.4, level: "ground", bodyPos: "basic" };
+    }
+  });
+  if (viewMode === "top") renderTokensTop();
+  else renderTokensFront();
+}
+
+function renderTokensTop() {
+  const frame = getDisplayFrame();
+  members.forEach(m => {
+    const pos = frame.positions[m.id];
+    // Detect stunt role for badge
+    let stuntTag = "";
+    for (const s of frame.stunts) {
+      if (s.topId === m.id) { stuntTag = "T"; break; }
+      if (s.baseIds.includes(m.id)) { stuntTag = "B"; break; }
+      if (s.spotterId === m.id) { stuntTag = "Sp"; break; }
+      if (s.backspotId === m.id) { stuntTag = "Bk"; break; }
+    }
+    const tok = document.createElement("div");
+    tok.className = `token role-${m.role} level-${pos.level || "ground"}` + (m.id === selectedMemberId ? " selected" : "") + (stuntTag ? " in-stunt" : "");
+    tok.dataset.id = m.id;
+    if (stuntTag) tok.dataset.stuntTag = stuntTag;
+    const showBP = (m.role === "top" && (pos.level !== "ground") && pos.bodyPos !== "basic");
+    tok.innerHTML = `
+      <span class="name">${m.name}</span>
+      <span class="role-tag">${ROLES[m.role].short}</span>
+      ${showBP ? `<span class="body-pos-badge">${BODY_POSITIONS[pos.bodyPos]?.label?.slice(0,4) || ""}</span>` : ""}
+    `;
+    placeToken(tok, pos.x, pos.y);
+    floor.appendChild(tok);
+    enableDrag(tok);
+  });
+}
+
+function renderTokensFront() {
+  const frame = getDisplayFrame();
+  const r = floor.getBoundingClientRect();
+  // Sort by depth (back row first → drawn behind)
+  const sorted = members.slice().sort((a, b) => {
+    return (frame.positions[a.id]?.y || 0) - (frame.positions[b.id]?.y || 0);
+  });
+  sorted.forEach(m => {
+    const pos = frame.positions[m.id];
+    const stunt = frame.stunts.find(s =>
+      s.topId === m.id || s.baseIds.includes(m.id) || s.spotterId === m.id || s.backspotId === m.id
+    );
+    const fig = createFigure(m, pos, stunt, r);
+    floor.appendChild(fig);
+  });
+}
+
+/* ======== SVG figure / poses ======== */
+function svgPose(pose) {
+  // Coordinates: 0..100 wide, 0..150 tall. Feet at y=140.
+  // Head and body filled with primary color; limbs as dark strokes.
+  const sk = "#1a1a1a";
+  const sw = 4;
+  const head = `<circle cx="50" cy="22" r="12" data-color="primary" stroke="#fff" stroke-width="2"/>`;
+  const ln = (x1,y1,x2,y2,extra="") => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${sk}" stroke-width="${sw}" stroke-linecap="round" ${extra}/>`;
+  const dot = (x,y) => `<circle cx="${x}" cy="${y}" r="3.5" fill="${sk}"/>`;
+  let body = "";
+  switch (pose) {
+    case "armsUp": // base supporting
+      body = `
+        ${ln(50,34,50,86)}
+        ${ln(50,46,42,2)}
+        ${ln(50,46,58,2)}
+        ${dot(42,2)}${dot(58,2)}
+        ${ln(50,86,38,140)}
+        ${ln(50,86,62,140)}`; break;
+    case "spotterReach": // spotter behind, arms reaching up
+      body = `
+        ${ln(50,34,50,86)}
+        ${ln(50,46,38,4)}
+        ${ln(50,46,62,4)}
+        ${dot(38,4)}${dot(62,4)}
+        ${ln(50,86,40,140)}
+        ${ln(50,86,60,140)}`; break;
+    case "backspotReach": // backspot, arms forward at level
+      body = `
+        ${ln(50,34,50,86)}
+        ${ln(50,46,28,38)}
+        ${ln(50,46,72,38)}
+        ${dot(28,38)}${dot(72,38)}
+        ${ln(50,86,38,140)}
+        ${ln(50,86,62,140)}`; break;
+    case "topBasic":
+      body = `
+        ${ln(50,34,50,86)}
+        ${ln(50,46,32,28)}
+        ${ln(50,46,68,28)}
+        ${dot(32,28)}${dot(68,28)}
+        ${ln(50,86,46,140)}
+        ${ln(50,86,54,140)}`; break;
+    case "topLiberty": // one leg standing, other knee up with foot at standing knee
+      body = `
+        ${ln(50,34,50,86)}
+        ${ln(50,46,30,32)}
+        ${ln(50,46,70,32)}
+        ${dot(30,32)}${dot(70,32)}
+        ${ln(50,86,50,140)}
+        ${ln(50,86,32,108)}
+        ${ln(32,108,50,118)}`; break;
+    case "topHeelStretch": // standing leg + opposite leg straight up to head
+      body = `
+        ${ln(50,34,50,86)}
+        ${ln(50,46,46,-12)}
+        ${ln(50,46,76,32)}
+        ${dot(76,32)}
+        ${ln(50,86,52,140)}
+        ${ln(50,86,46,-12)}
+        ${dot(46,-12)}`; break;
+    case "topScorpion": // back leg up, hand reaching to foot behind
+      body = `
+        ${ln(50,34,55,86)}
+        ${ln(55,46,50,0)}
+        ${ln(55,46,32,30)}
+        ${dot(50,0)}${dot(32,30)}
+        ${ln(55,86,52,140)}
+        ${ln(55,86,82,40)}
+        ${ln(82,40,55,5)}`; break;
+    case "topArabesque": // body forward, back leg out horizontal
+      body = `
+        ${ln(50,38,62,82)}
+        ${ln(56,52,38,58)}
+        ${ln(56,52,84,42)}
+        ${dot(38,58)}${dot(84,42)}
+        ${ln(62,82,55,140)}
+        ${ln(62,82,108,64)}
+        ${dot(108,64)}`; break;
+    case "topBowAndArrow":
+      body = `
+        ${ln(50,34,50,86)}
+        ${ln(50,46,55,2)}
+        ${ln(50,46,72,32)}
+        ${ln(55,2,40,16)}
+        ${dot(40,16)}
+        ${ln(50,86,52,140)}
+        ${ln(50,86,55,2)}`; break;
+    case "standing":
+    default:
+      body = `
+        ${ln(50,34,50,86)}
+        ${ln(50,46,32,72)}
+        ${ln(50,46,68,72)}
+        ${ln(50,86,38,140)}
+        ${ln(50,86,62,140)}`; break;
+  }
+  const h = Math.round(figureHeight);
+  const w = Math.round(figureHeight * 60 / 76);
+  return `<svg viewBox="-15 -20 130 165" width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">${head}${body}</svg>`;
+}
+
+function pickPose(m, pos, stunt) {
+  if (stunt) {
+    if (stunt.topId === m.id) {
+      const bp = pos.bodyPos || "basic";
+      if (bp === "liberty") return "topLiberty";
+      if (bp === "heelStretch") return "topHeelStretch";
+      if (bp === "scorpion") return "topScorpion";
+      if (bp === "arabesque") return "topArabesque";
+      if (bp === "bowAndArrow") return "topBowAndArrow";
+      return "topBasic";
+    }
+    if (stunt.baseIds.includes(m.id)) return "armsUp";
+    if (stunt.spotterId === m.id) return "spotterReach";
+    if (stunt.backspotId === m.id) return "backspotReach";
+  }
+  if (pos.level === "shoulder" || pos.level === "extension") return "topBasic";
+  return "standing";
+}
+
+function createFigure(m, pos, stunt, floorRect) {
+  const pose = pickPose(m, pos, stunt);
+  const horizon = 0.45; // sky/audience above, stage below — give extra headroom
+  const stagePart = 1 - horizon;
+  const depth = pos.y; // 0 = far back, 1 = closest
+  const scale = 0.6 + 0.45 * depth;
+  // Foot ground line (where the figure's feet should land before level offset)
+  const footY = floorRect.height * (horizon + stagePart * depth);
+  // Level offset (pixels above floor)
+  const figH = figureHeight;
+  let levelOffset = 0;
+  if (pos.level === "shoulder")  levelOffset = figH * 0.50 * scale;
+  if (pos.level === "extension") levelOffset = figH * 0.85 * scale;
+
+  const fig = document.createElement("div");
+  fig.className = `figure role-${m.role}` + (m.id === selectedMemberId ? " selected" : "");
+  fig.dataset.id = m.id;
+  fig.innerHTML = svgPose(pose) + `<div class="name-label">${m.name}</div>`;
+  const leftPx = pos.x * floorRect.width;
+  const topPx  = footY - figH - levelOffset;
+  fig.style.left = leftPx + "px";
+  fig.style.top  = topPx + "px";
+  fig.style.transform = `translateX(-50%) scale(${scale})`;
+  fig.style.transformOrigin = "center bottom";
+  enableDragFront(fig);
+  return fig;
+}
+
+function enableDragFront(fig) {
+  let dragging = false, pointerId = null, moved = false;
+  let startX = 0, startY = 0;
+  fig.addEventListener("pointerdown", e => {
+    if (isPlaying) return;
+    if (scrubMode) { showHint("スクラブ中は編集できません。「終了」または「ここで分割」を押してください"); return; }
+    dragging = true; moved = false;
+    pointerId = e.pointerId;
+    startX = e.clientX; startY = e.clientY;
+    fig.setPointerCapture(pointerId);
+    fig.classList.add("dragging");
+    e.preventDefault();
+  });
+  fig.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if (Math.hypot(dx, dy) > 4) moved = true;
+    const r = floor.getBoundingClientRect();
+    let x = (e.clientX - r.left) / r.width;
+    const horizon = 0.45, stagePart = 0.55;
+    const myFoot = (e.clientY - r.top) / r.height;
+    let y = (myFoot - horizon) / stagePart;
+    x = Math.max(0.03, Math.min(0.97, x));
+    y = Math.max(0.02, Math.min(0.98, y));
+    const id = +fig.dataset.id;
+    const pos = frames[currentFrameIdx].positions[id];
+    const oldX = pos.x, oldY = pos.y;
+    pos.x = x; pos.y = y;
+    applyFigureVisualPosition(fig, pos, r);
+    moveStuntGroupBy(id, x - oldX, y - oldY, frames[currentFrameIdx]);
+  });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    fig.classList.remove("dragging");
+    if (pointerId !== null) { try { fig.releasePointerCapture(pointerId); } catch(_){} }
+    if (!moved) onFigureTap(fig);
+    else snapshot("移動");
+  };
+  fig.addEventListener("pointerup", end);
+  fig.addEventListener("pointercancel", end);
+}
+
+let lastFigTapId = null, lastFigTapTime = 0;
+function onFigureTap(fig) {
+  const id = +fig.dataset.id;
+  const now = Date.now();
+  if (lastFigTapId === id && now - lastFigTapTime < 320) {
+    cycleLevel(id);
+    lastFigTapId = null;
+  } else {
+    selectedMemberId = id;
+    renderTokens(); renderMemberControl();
+    showHint("選択：" + members.find(m=>m.id===id).name);
+  }
+  lastFigTapTime = now; lastFigTapId = id;
+}
+function placeToken(tok, nx, ny) {
+  const r = floor.getBoundingClientRect();
+  tok.style.left = (nx * r.width) + "px";
+  tok.style.top  = (ny * r.height) + "px";
+}
+/* Visual position helpers + stunt group helpers */
+function applyFigureVisualPosition(fig, pos, floorRect) {
+  const horizon = 0.45, stagePart = 0.55;
+  const depth = pos.y;
+  const scale = 0.6 + 0.45 * depth;
+  const footY = floorRect.height * (horizon + stagePart * depth);
+  const figH = figureHeight;
+  let levelOffset = 0;
+  if (pos.level === "shoulder") levelOffset = figH * 0.50 * scale;
+  if (pos.level === "extension") levelOffset = figH * 0.85 * scale;
+  fig.style.left = (pos.x * floorRect.width) + "px";
+  fig.style.top  = (footY - figH - levelOffset) + "px";
+  fig.style.transform = `translateX(-50%) scale(${scale})`;
+}
+function getStuntForMember(memberId, frame) {
+  return frame.stunts.find(s =>
+    s.topId === memberId ||
+    s.baseIds.includes(memberId) ||
+    s.spotterId === memberId ||
+    s.backspotId === memberId
+  );
+}
+function getStuntMemberIds(stunt) {
+  const set = new Set();
+  if (stunt.topId) set.add(stunt.topId);
+  (stunt.baseIds || []).forEach(id => id && set.add(id));
+  if (stunt.spotterId) set.add(stunt.spotterId);
+  if (stunt.backspotId) set.add(stunt.backspotId);
+  return [...set];
+}
+function moveStuntGroupBy(driverId, dx, dy, frame) {
+  if (!groupMoveActive) return false;
+  const stunt = getStuntForMember(driverId, frame);
+  if (!stunt) return false;
+  const ids = getStuntMemberIds(stunt).filter(id => id !== driverId);
+  if (ids.length === 0) return false;
+  const r = floor.getBoundingClientRect();
+  ids.forEach(id => {
+    const p = frame.positions[id];
+    if (!p) return;
+    p.x = Math.max(0.03, Math.min(0.97, p.x + dx));
+    p.y = Math.max(0.02, Math.min(0.98, p.y + dy));
+    if (viewMode === "top") {
+      const otherTok = floor.querySelector(`.token[data-id="${id}"]`);
+      if (otherTok) placeToken(otherTok, p.x, p.y);
+    } else {
+      const otherFig = floor.querySelector(`.figure[data-id="${id}"]`);
+      if (otherFig) applyFigureVisualPosition(otherFig, p, r);
+    }
+  });
+  return true;
+}
+
+function enableDrag(tok) {
+  let dragging = false;
+  let pointerId = null;
+  let downTime = 0;
+  let moved = false;
+  let startX = 0, startY = 0;
+  tok.addEventListener("pointerdown", e => {
+    if (isPlaying) return;
+    if (scrubMode) { showHint("スクラブ中は編集できません。「終了」または「ここで分割」を押してください"); return; }
+    dragging = true; moved = false;
+    pointerId = e.pointerId;
+    downTime = Date.now();
+    startX = e.clientX; startY = e.clientY;
+    tok.setPointerCapture(pointerId);
+    tok.classList.add("dragging");
+    e.preventDefault();
+  });
+  tok.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if (Math.hypot(dx, dy) > 4) moved = true;
+    const r = floor.getBoundingClientRect();
+    let x = (e.clientX - r.left) / r.width;
+    let y = (e.clientY - r.top) / r.height;
+    x = Math.max(0.03, Math.min(0.97, x));
+    y = Math.max(0.05, Math.min(0.95, y));
+    const id = +tok.dataset.id;
+    const pos = frames[currentFrameIdx].positions[id];
+    const oldX = pos.x, oldY = pos.y;
+    pos.x = x; pos.y = y;
+    placeToken(tok, x, y);
+    moveStuntGroupBy(id, x - oldX, y - oldY, frames[currentFrameIdx]);
+  });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    tok.classList.remove("dragging");
+    if (pointerId !== null) { try { tok.releasePointerCapture(pointerId); } catch(_){} }
+    if (!moved) onTokenTap(tok);
+    else snapshot("移動");
+  };
+  tok.addEventListener("pointerup", end);
+  tok.addEventListener("pointercancel", end);
+}
+
+let lastTapId = null;
+let lastTapTime = 0;
+function onTokenTap(tok) {
+  const id = +tok.dataset.id;
+  const now = Date.now();
+  if (lastTapId === id && now - lastTapTime < 320) {
+    cycleLevel(id);
+    lastTapId = null;
+  } else {
+    selectedMemberId = id;
+    renderTokens(); renderMemberControl();
+    showHint("選択：" + members.find(m=>m.id===id).name);
+  }
+  lastTapTime = now;
+  lastTapId = id;
+}
+function cycleLevel(id) {
+  const pos = frames[currentFrameIdx].positions[id];
+  const order = ["ground", "shoulder", "extension"];
+  const i = order.indexOf(pos.level || "ground");
+  pos.level = order[(i + 1) % order.length];
+  if (pos.level === "ground") pos.bodyPos = "basic";
+  renderTokens(); renderMemberControl();
+  snapshot("高さ変更");
+  const lbl = pos.level === "ground" ? "地上" : pos.level === "shoulder" ? "肩" : "エクステンション";
+  showHint("高さ: " + lbl);
+}
+
+/* ======== Stunts ======== */
+function memberOption(id, currentId) {
+  const m = members.find(x => x.id === id);
+  if (!m) return "";
+  return `<option value="${id}" ${id===currentId?"selected":""}>${m.name}（${ROLES[m.role].label}）</option>`;
+}
+function renderStunts() {
+  const frame = frames[currentFrameIdx];
+  stuntList.innerHTML = "";
+  if (!frame) return;
+  if (frame.stunts.length === 0) {
+    stuntList.innerHTML = `<div style="font-size:11px;color:var(--muted);padding:8px;background:var(--panel-2);border-radius:8px;line-height:1.5">
+      この隊形にスタンツはまだありません。<br>
+      <b>作り方：</b>フロアでトップ役を選び、操作カードの「＋ スタンツ作成」をタップ。
+    </div>`;
+    return;
+  }
+  frame.stunts.forEach(s => {
+    const top = members.find(m => m.id === s.topId);
+    const pos = top ? frame.positions[top.id] : null;
+    const memberOptions = members.map(m => memberOption(m.id, -1)).join("");
+    const memberOptionsWithNone = `<option value="">（なし）</option>` + memberOptions;
+    const card = document.createElement("div");
+    card.className = "stunt-card";
+    card.innerHTML = `
+      <div class="stunt-header">
+        <span class="name-line">${STUNT_TYPES[s.type].label}</span>
+        <button class="removebtn" data-id="${s.id}">解除</button>
+      </div>
+      <div class="role-row">
+        <span class="role-tag role-top">トップ</span>
+        <select data-stunt="${s.id}" data-role="top">
+          ${members.map(m => `<option value="${m.id}" ${m.id===s.topId?"selected":""}>${m.name}（${ROLES[m.role].label}）</option>`).join("")}
+        </select>
+      </div>
+      <div class="role-row">
+        <span class="role-tag role-base">ベース1</span>
+        <select data-stunt="${s.id}" data-role="base0">
+          <option value="">（なし）</option>
+          ${members.map(m => `<option value="${m.id}" ${m.id===(s.baseIds[0]||null)?"selected":""}>${m.name}（${ROLES[m.role].label}）</option>`).join("")}
+        </select>
+      </div>
+      <div class="role-row">
+        <span class="role-tag role-base">ベース2</span>
+        <select data-stunt="${s.id}" data-role="base1">
+          <option value="">（なし）</option>
+          ${members.map(m => `<option value="${m.id}" ${m.id===(s.baseIds[1]||null)?"selected":""}>${m.name}（${ROLES[m.role].label}）</option>`).join("")}
+        </select>
+      </div>
+      <div class="role-row">
+        <span class="role-tag role-spotter">スポット</span>
+        <select data-stunt="${s.id}" data-role="spotter">
+          <option value="">（なし）</option>
+          ${members.map(m => `<option value="${m.id}" ${m.id===s.spotterId?"selected":""}>${m.name}（${ROLES[m.role].label}）</option>`).join("")}
+        </select>
+      </div>
+      <div class="role-row">
+        <span class="role-tag role-backspot">バック</span>
+        <select data-stunt="${s.id}" data-role="backspot">
+          <option value="">（なし）</option>
+          ${members.map(m => `<option value="${m.id}" ${m.id===s.backspotId?"selected":""}>${m.name}（${ROLES[m.role].label}）</option>`).join("")}
+        </select>
+      </div>
+      <div class="role-row">
+        <span class="role-tag role-info">技種別</span>
+        <select data-stunt="${s.id}" data-attr="type">
+          ${Object.entries(STUNT_TYPES).map(([k,v]) =>
+            `<option value="${k}" ${k===s.type?"selected":""}>${v.label}</option>`
+          ).join("")}
+        </select>
+      </div>
+      ${top ? `<div class="role-row">
+        <span class="role-tag role-info">ボディポジション</span>
+        <select data-stunt="${s.id}" data-attr="bodyPos">
+          ${Object.entries(BODY_POSITIONS).map(([k,v]) =>
+            `<option value="${k}" ${pos?.bodyPos===k?"selected":""}>${v.label}</option>`
+          ).join("")}
+        </select>
+      </div>` : ""}
+    `;
+    stuntList.appendChild(card);
+  });
+  stuntList.querySelectorAll(".removebtn").forEach(b => {
+    b.addEventListener("click", e => {
+      const id = +e.target.dataset.id;
+      const f = frames[currentFrameIdx];
+      const stunt = f.stunts.find(s => s.id === id);
+      if (stunt) {
+        const pos = f.positions[stunt.topId];
+        if (pos) { pos.level = "ground"; pos.bodyPos = "basic"; }
+      }
+      f.stunts = f.stunts.filter(s => s.id !== id);
+      renderStunts(); renderTokens(); renderScore(); renderMemberControl();
+      snapshot("スタンツ解除");
+    });
+  });
+  stuntList.querySelectorAll("select").forEach(sel => {
+    sel.addEventListener("change", e => {
+      const id = +e.target.dataset.stunt;
+      const f = frames[currentFrameIdx];
+      const stunt = f.stunts.find(s => s.id === id);
+      if (!stunt) return;
+      const role = e.target.dataset.role;
+      const attr = e.target.dataset.attr;
+      if (role === "top") {
+        // Old top → reset to ground
+        const oldTopPos = f.positions[stunt.topId];
+        if (oldTopPos) { oldTopPos.level = "ground"; oldTopPos.bodyPos = "basic"; }
+        const newId = +e.target.value;
+        stunt.topId = newId;
+        // New top → set level based on stunt type
+        const newTopPos = f.positions[newId];
+        if (newTopPos) {
+          newTopPos.level = STUNT_TYPES[stunt.type].level;
+          if (newTopPos.bodyPos === undefined || newTopPos.bodyPos === "basic") newTopPos.bodyPos = "basic";
+        }
+      } else if (role === "base0" || role === "base1") {
+        const idx = role === "base0" ? 0 : 1;
+        const v = e.target.value;
+        if (!v) {
+          stunt.baseIds.splice(idx, 1);
+        } else {
+          stunt.baseIds[idx] = +v;
+        }
+      } else if (role === "spotter") {
+        stunt.spotterId = e.target.value ? +e.target.value : null;
+      } else if (role === "backspot") {
+        stunt.backspotId = e.target.value ? +e.target.value : null;
+      } else if (attr === "type") {
+        stunt.type = e.target.value;
+        const lvl = STUNT_TYPES[stunt.type].level;
+        const pos = f.positions[stunt.topId];
+        if (pos) pos.level = lvl;
+      } else if (attr === "bodyPos") {
+        const pos = f.positions[stunt.topId];
+        if (pos) pos.bodyPos = e.target.value;
+      }
+      renderStunts(); renderTokens(); renderScore(); renderMemberControl();
+      snapshot("スタンツ変更");
+    });
+  });
+}
+
+document.getElementById("addStunt").addEventListener("click", () => createStuntForSelected());
+
+/* ======== Scoring ======== */
+function computeStats() {
+  const stats = {
+    byType: Object.fromEntries(Object.keys(STUNT_TYPES).map(k => [k, 0])),
+    bodyPosCount: Object.fromEntries(Object.keys(BODY_POSITIONS).map(k => [k, 0])),
+    extensionTotal: 0,
+    shoulderTotal: 0,
+    frameCount: frames.length,
+  };
+  frames.forEach(f => {
+    f.stunts.forEach(s => {
+      stats.byType[s.type] = (stats.byType[s.type] || 0) + 1;
+      const pos = f.positions[s.topId];
+      if (pos) {
+        if (pos.level === "extension") stats.extensionTotal++;
+        if (pos.level === "shoulder") stats.shoulderTotal++;
+        if (pos.bodyPos) stats.bodyPosCount[pos.bodyPos] = (stats.bodyPosCount[pos.bodyPos] || 0) + 1;
+      }
+    });
+  });
+  return stats;
+}
+
+function renderScore() {
+  const s = computeStats();
+  // rules
+  ruleList.innerHTML = "";
+  let total = 0;
+  RULES.forEach(r => {
+    const ok = r.check(s);
+    if (ok) total += r.pts;
+    const el = document.createElement("div");
+    el.className = "rule " + (ok ? "ok" : "ng");
+    el.innerHTML = `
+      <span class="check">${ok ? "✓" : "·"}</span>
+      <span class="text"><b>${r.name}</b><br><span style="color:var(--muted);font-size:10px">${r.detail}</span></span>
+      <span class="pts">${ok ? "+"+r.pts.toFixed(1) : "—"}</span>
+    `;
+    ruleList.appendChild(el);
+  });
+  totalPtsEl.querySelector(".num").textContent = total.toFixed(1);
+  // summary
+  const lines = [];
+  Object.entries(s.byType).forEach(([k, v]) => {
+    if (v > 0) lines.push(`<div><span style="color:var(--accent-3)">${STUNT_TYPES[k].label}</span> × ${v}基</div>`);
+  });
+  Object.entries(s.bodyPosCount).forEach(([k, v]) => {
+    if (v > 0 && k !== "basic") lines.push(`<div style="color:var(--muted);font-size:10px">└ ${BODY_POSITIONS[k].label} ${v}</div>`);
+  });
+  if (lines.length === 0) lines.push(`<div style="color:var(--muted)">スタンツがまだ登録されていません</div>`);
+  summaryList.innerHTML = lines.join("");
+}
+
+/* ======== Count Bar ======== */
+function renderCountBar() {
+  countBar.innerHTML = `<h3>COUNT</h3>`;
+  frames.forEach((f, idx) => {
+    const grp = document.createElement("div");
+    grp.className = "count-frame-group" + (idx === currentFrameIdx ? " active" : "");
+    grp.dataset.frame = idx;
+    let html = `<div class="count-frame-name">${idx+1}.${f.name.slice(0,5)}</div>`;
+    for (let c = 1; c <= f.counts; c++) {
+      html += `<div class="count-cell" data-frame="${idx}" data-count="${c}">${c}</div>`;
+    }
+    grp.innerHTML = html;
+    countBar.appendChild(grp);
+  });
+  // Make count cells clickable to enter scrub at that count
+  countBar.querySelectorAll(".count-cell").forEach(cell => {
+    cell.addEventListener("click", () => {
+      if (isPlaying) return;
+      const fi = +cell.dataset.frame;
+      const ci = +cell.dataset.count;
+      scrubMode = true;
+      scrubGlobalCount = globalCountForFrame(fi, ci);
+      updateScrubUI();
+      renderTokens();
+    });
+  });
+  // Reflect current scrub position
+  if (scrubMode) updateScrubHighlight();
+}
+function updateScrubHighlight() {
+  countBar.querySelectorAll(".count-cell").forEach(c => c.classList.remove("scrub"));
+  const { frameIdx, localCount } = findFrameAtGlobalCount(scrubGlobalCount);
+  const cell = countBar.querySelector(`.count-cell[data-frame="${frameIdx}"][data-count="${localCount}"]`);
+  if (cell) {
+    cell.classList.add("scrub");
+    cell.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+}
+function updateScrubUI() {
+  const info = document.getElementById("scrubInfo");
+  const exitBtn = document.getElementById("exitScrubBtn");
+  const splitBtn = document.getElementById("splitBtn");
+  if (scrubMode) {
+    const { frameIdx, localCount } = findFrameAtGlobalCount(scrubGlobalCount);
+    const f = frames[frameIdx];
+    info.textContent = `🎯 確認 ${localCount}/${f.counts} (${f.name})`;
+    info.classList.remove("idle");
+    exitBtn.style.display = "";
+    splitBtn.style.display = "";
+    floor.classList.add("scrub-active");
+    updateScrubHighlight();
+  } else {
+    info.textContent = "◀▶で1カウントずつ確認モードに入る";
+    info.classList.add("idle");
+    exitBtn.style.display = "none";
+    splitBtn.style.display = "none";
+    floor.classList.remove("scrub-active");
+    countBar.querySelectorAll(".count-cell").forEach(c => c.classList.remove("scrub"));
+  }
+}
+function updateCountBar(frameIdx, count) {
+  countBar.querySelectorAll(".count-cell").forEach(c => {
+    c.classList.remove("now", "passed");
+  });
+  countBar.querySelectorAll(".count-frame-group").forEach(g => g.classList.remove("active"));
+  const grp = countBar.querySelector(`.count-frame-group[data-frame="${frameIdx}"]`);
+  if (grp) grp.classList.add("active");
+  // mark passed counts in earlier frames
+  countBar.querySelectorAll(".count-cell").forEach(c => {
+    const fi = +c.dataset.frame, ci = +c.dataset.count;
+    if (fi < frameIdx) c.classList.add("passed");
+    else if (fi === frameIdx && ci < count) c.classList.add("passed");
+    else if (fi === frameIdx && ci === count) c.classList.add("now");
+  });
+  // scroll into view
+  const cell = countBar.querySelector(`.count-cell.now`);
+  if (cell) cell.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+/* ======== Timeline ======== */
+function renderTimeline() {
+  timeline.innerHTML = "";
+  frames.forEach((f, idx) => {
+    const el = document.createElement("div");
+    el.className = "frame" + (idx === currentFrameIdx ? " active" : "");
+    el.innerHTML = `
+      <div class="frame-title">${idx + 1}. ${f.name}</div>
+      <div class="frame-meta">${f.counts}カウント ／ スタンツ ${f.stunts.length}基</div>
+      <div class="frame-actions">
+        <button data-act="rename">名前</button>
+        <button data-act="dup">複製</button>
+        <button data-act="del">削除</button>
+      </div>
+    `;
+    el.addEventListener("click", e => {
+      if (e.target.tagName === "BUTTON") {
+        const act = e.target.dataset.act;
+        if (act === "rename") {
+          const n = prompt("隊形の名前", f.name);
+          if (n) { f.name = n; renderAll(); snapshot("隊形名変更"); }
+        } else if (act === "dup") {
+          const copy = JSON.parse(JSON.stringify(f));
+          copy.id = frameIdSeq++;
+          copy.name = f.name + " 複製";
+          copy.stunts.forEach(s => s.id = stuntIdSeq++);
+          frames.splice(idx + 1, 0, copy);
+          renderAll();
+          snapshot("隊形複製");
+        } else if (act === "del") {
+          if (frames.length <= 1) return showHint("最低1つは必要です");
+          frames.splice(idx, 1);
+          if (currentFrameIdx >= frames.length) currentFrameIdx = frames.length - 1;
+          renderAll();
+          snapshot("隊形削除");
+        }
+        return;
+      }
+      currentFrameIdx = idx;
+      scrubMode = false;
+      renderAll();
+    });
+    timeline.appendChild(el);
+  });
+  frameInfo.textContent = `隊形 ${currentFrameIdx + 1} / ${frames.length}：${frames[currentFrameIdx].name}`;
+  frameCountEl.textContent = frames.length;
+  countTotalEl.textContent = frames[currentFrameIdx].counts;
+}
+
+/* ======== Audio ======== */
+const audioEl = document.getElementById("audio");
+const audioProgress = document.getElementById("audioProgress");
+const audioTimeEl = document.getElementById("audioTime");
+
+function fmtTime(s) {
+  if (!isFinite(s)) return "0:00";
+  s = Math.max(0, s);
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return m + ":" + (sec < 10 ? "0" : "") + sec;
+}
+
+document.getElementById("loadAudio").addEventListener("click", () => {
+  document.getElementById("audioFile").click();
+});
+document.getElementById("audioFile").addEventListener("change", e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  audioEl.src = url;
+  document.getElementById("audioName").textContent = f.name;
+  audioEl.addEventListener("loadedmetadata", () => {
+    audioTimeEl.textContent = "0:00 / " + fmtTime(audioEl.duration);
+  }, { once: true });
+  showHint("音源を読み込みました：" + f.name);
+});
+document.getElementById("bpmInput").addEventListener("change", e => {
+  bpm = +e.target.value || 120;
+  showHint("BPM = " + bpm + " （1カウント " + countDuration().toFixed(0) + "ms）");
+});
+document.getElementById("offsetInput").addEventListener("change", e => {
+  audioOffset = +e.target.value || 0;
+});
+document.getElementById("loopWholeInput").addEventListener("change", e => {
+  audioEl.loop = e.target.checked;
+});
+
+/* Playback speed */
+document.getElementById("rateInput").addEventListener("change", e => {
+  playbackRate = parseFloat(e.target.value) || 1.0;
+  audioEl.playbackRate = playbackRate;
+  showHint("速度 " + playbackRate + "x  ／  1カウント " + countDuration().toFixed(0) + "ms");
+});
+
+/* Section loop (in / out / clear) */
+const loopDisplay = document.getElementById("loopDisplay");
+const loopRegionEl = document.getElementById("loopRegion");
+function updateLoopUI() {
+  const a = loopStart !== null ? fmtTime(loopStart) : "-";
+  const b = loopEnd !== null ? fmtTime(loopEnd) : "-";
+  loopDisplay.textContent = a + " / " + b;
+  if (loopStart !== null && loopEnd !== null && audioEl.duration && loopEnd > loopStart) {
+    const sa = (loopStart / audioEl.duration) * 100;
+    const sb = (loopEnd / audioEl.duration) * 100;
+    loopRegionEl.style.left = sa + "%";
+    loopRegionEl.style.width = (sb - sa) + "%";
+    loopRegionEl.style.display = "block";
+  } else {
+    loopRegionEl.style.display = "none";
+  }
+}
+document.getElementById("loopIn").addEventListener("click", () => {
+  if (!audioEl.src) return showHint("先に音源を読み込んでください");
+  loopStart = audioEl.currentTime || 0;
+  if (loopEnd !== null && loopEnd <= loopStart) loopEnd = null;
+  updateLoopUI();
+  showHint("ループ開始：" + fmtTime(loopStart));
+});
+document.getElementById("loopOut").addEventListener("click", () => {
+  if (!audioEl.src) return showHint("先に音源を読み込んでください");
+  loopEnd = audioEl.currentTime || 0;
+  if (loopStart !== null && loopEnd <= loopStart) loopStart = 0;
+  updateLoopUI();
+  showHint("ループ終了：" + fmtTime(loopEnd));
+});
+document.getElementById("loopClear").addEventListener("click", () => {
+  loopStart = loopEnd = null;
+  updateLoopUI();
+  showHint("ループ区間をクリアしました");
+});
+
+/* Click on waveform to seek */
+document.getElementById("waveform").addEventListener("click", e => {
+  if (!audioEl.duration) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const ratio = (e.clientX - r.left) / r.width;
+  audioEl.currentTime = audioEl.duration * Math.max(0, Math.min(1, ratio));
+});
+
+audioEl.addEventListener("timeupdate", () => {
+  if (audioEl.duration) {
+    audioProgress.style.width = (audioEl.currentTime / audioEl.duration * 100) + "%";
+    audioTimeEl.textContent = fmtTime(audioEl.currentTime) + " / " + fmtTime(audioEl.duration);
+  }
+  // Section loop wrap-around
+  if (loopStart !== null && loopEnd !== null && loopEnd > loopStart && audioEl.currentTime >= loopEnd) {
+    audioEl.currentTime = loopStart;
+  }
+});
+audioEl.addEventListener("loadedmetadata", () => {
+  updateLoopUI();
+});
+audioEl.addEventListener("ended", () => {
+  if (isPlaying) { isPlaying = false; document.getElementById("playBtn").textContent = "▶ 再生"; }
+});
+
+/* BPM auto-detection (Web Audio API) */
+document.getElementById("detectBpm").addEventListener("click", async () => {
+  const fileInput = document.getElementById("audioFile");
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) { showHint("先に音源ファイルを選んでください"); return; }
+  const btn = document.getElementById("detectBpm");
+  btn.disabled = true; btn.textContent = "解析中…";
+  try {
+    const arrBuf = await file.arrayBuffer();
+    const tmpCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioBuf = await tmpCtx.decodeAudioData(arrBuf.slice(0));
+    tmpCtx.close();
+    // Offline pass: low-pass filter to isolate kick/bass
+    const offline = new OfflineAudioContext(1, audioBuf.length, audioBuf.sampleRate);
+    const src = offline.createBufferSource();
+    src.buffer = audioBuf;
+    const lp = offline.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 150;
+    src.connect(lp); lp.connect(offline.destination);
+    src.start(0);
+    const filtered = await offline.startRendering();
+    const data = filtered.getChannelData(0);
+    const sr = filtered.sampleRate;
+    // Find peaks (values that exceed a threshold)
+    let max = 0;
+    for (let i = 0; i < data.length; i++) { const v = Math.abs(data[i]); if (v > max) max = v; }
+    const threshold = max * 0.85;
+    const peaks = [];
+    const minGap = Math.floor(sr * 0.22); // ignore peaks within 220ms
+    for (let i = 1; i < data.length - 1; i++) {
+      const v = data[i];
+      if (v > threshold && v >= data[i-1] && v >= data[i+1]) {
+        peaks.push(i);
+        i += minGap;
+      }
+    }
+    if (peaks.length < 4) {
+      showHint("BPMを検出できませんでした（ピークが少なすぎます）");
+      return;
+    }
+    // Histogram of intervals → bpm guesses
+    const histogram = {};
+    for (let i = 0; i < peaks.length; i++) {
+      for (let j = 1; j <= 10 && i + j < peaks.length; j++) {
+        const intSec = (peaks[i + j] - peaks[i]) / sr;
+        if (intSec <= 0) continue;
+        let g = 60 / intSec;
+        while (g < 70) g *= 2;
+        while (g > 180) g /= 2;
+        const k = Math.round(g);
+        histogram[k] = (histogram[k] || 0) + 1;
+      }
+    }
+    // Smooth: combine ±1 BPM neighbors
+    const smoothed = {};
+    Object.keys(histogram).forEach(k => {
+      const ki = +k;
+      smoothed[ki] = (histogram[ki] || 0) + 0.5*(histogram[ki-1]||0) + 0.5*(histogram[ki+1]||0);
+    });
+    let best = 0, bestScore = 0;
+    for (const [k, v] of Object.entries(smoothed)) {
+      if (v > bestScore) { bestScore = v; best = +k; }
+    }
+    if (best > 0) {
+      bpm = best;
+      document.getElementById("bpmInput").value = best;
+      showHint("検出BPM: " + best + " （1カウント " + countDuration().toFixed(0) + "ms）");
+    } else {
+      showHint("BPMを検出できませんでした");
+    }
+  } catch (err) {
+    console.error(err);
+    showHint("BPM解析でエラーが発生しました");
+  } finally {
+    btn.disabled = false; btn.textContent = "BPM自動";
+  }
+});
+
+/* ======== Playback ======== */
+function play() {
+  if (frames.length < 2) return showHint("隊形を2つ以上作ってください");
+  isPlaying = true;
+  scrubMode = false; updateScrubUI();
+  tapToMoveActive = false;
+  renderMemberControl();
+  document.getElementById("playBtn").textContent = "■ 停止";
+  currentFrameIdx = 0;
+  renderTokens(); renderTimeline(); renderCountBar();
+  // start audio if loaded
+  if (audioEl.src) {
+    try {
+      audioEl.playbackRate = playbackRate;
+      audioEl.currentTime = (loopStart !== null) ? loopStart : audioOffset;
+      audioEl.play().catch(() => {});
+    } catch(_) {}
+  }
+  // step from frame 0 to 1, 1 to 2, ...
+  setTimeout(() => stepTo(1), 50);
+
+  function stepTo(nextIdx) {
+    if (!isPlaying) return cleanup();
+    if (nextIdx >= frames.length) return cleanup();
+    const fromFrame = frames[nextIdx - 1];
+    const toFrame = frames[nextIdx];
+    const dur = toFrame.counts * countDuration();
+    currentFrameIdx = nextIdx;
+    countTotalEl.textContent = toFrame.counts;
+    // animate (top view: tokens, front view: figures)
+    const r = floor.getBoundingClientRect();
+    if (viewMode === "top") {
+      floor.querySelectorAll(".token").forEach(tok => {
+        const id = +tok.dataset.id;
+        const pos = toFrame.positions[id] || fromFrame.positions[id];
+        if (pos) {
+          tok.style.transition = `left ${dur}ms cubic-bezier(.4,.05,.3,1), top ${dur}ms cubic-bezier(.4,.05,.3,1), transform .35s, box-shadow .35s`;
+          tok.style.left = (pos.x * r.width) + "px";
+          tok.style.top  = (pos.y * r.height) + "px";
+          tok.classList.remove("level-ground","level-shoulder","level-extension");
+          tok.classList.add(`level-${pos.level || "ground"}`);
+        }
+      });
+    } else {
+      // Front view: animate existing figures to target positions (poses refresh after frame ends)
+      floor.querySelectorAll(".figure").forEach(fig => {
+        const id = +fig.dataset.id;
+        const pos = toFrame.positions[id];
+        if (!pos) return;
+        const horizon = 0.45, stagePart = 0.55;
+        const depth = pos.y;
+        const scale = 0.6 + 0.45 * depth;
+        const footY = r.height * (horizon + stagePart * depth);
+        const figH = figureHeight;
+        let levelOffset = 0;
+        if (pos.level === "shoulder")  levelOffset = figH * 0.50 * scale;
+        if (pos.level === "extension") levelOffset = figH * 0.85 * scale;
+        fig.style.transition = `left ${dur}ms cubic-bezier(.4,.05,.3,1), top ${dur}ms cubic-bezier(.4,.05,.3,1), transform ${dur}ms cubic-bezier(.4,.05,.3,1)`;
+        fig.style.left = (pos.x * r.width) + "px";
+        fig.style.top  = (footY - figH - levelOffset) + "px";
+        fig.style.transform = `translateX(-50%) scale(${scale})`;
+      });
+    }
+    renderTimeline();
+    const startT = performance.now();
+    function tick() {
+      if (!isPlaying) return cleanup();
+      const e = performance.now() - startT;
+      const c = Math.min(toFrame.counts, Math.floor(e / countDuration()) + 1);
+      countNowEl.textContent = c;
+      updateCountBar(nextIdx, c);
+      if (e >= dur) {
+        renderTokens(); // refresh body-pos badges etc.
+        return stepTo(nextIdx + 1);
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  function cleanup() {
+    isPlaying = false;
+    document.getElementById("playBtn").textContent = "▶ 再生";
+    floor.querySelectorAll(".token").forEach(t => t.style.transition = "");
+    floor.querySelectorAll(".figure").forEach(t => t.style.transition = "");
+    if (audioEl.src && !audioEl.loop) audioEl.pause();
+    renderTimeline(); renderMemberControl();
+  }
+}
+
+/* ======== Buttons ======== */
+document.getElementById("playBtn").addEventListener("click", () => {
+  if (isPlaying) {
+    isPlaying = false;
+    document.getElementById("playBtn").textContent = "▶ 再生";
+    if (audioEl.src) audioEl.pause();
+  }
+  else play();
+});
+document.getElementById("addMember").addEventListener("click", () => {
+  const name = prompt("メンバー名は？", "新メンバー");
+  if (!name) return;
+  members.push({ id: memberIdSeq++, name, role: "base" });
+  renderAll();
+  snapshot("メンバー追加");
+});
+document.getElementById("addFrame").addEventListener("click", () => {
+  const cur = frames[currentFrameIdx];
+  const copy = JSON.parse(JSON.stringify(cur));
+  copy.id = frameIdSeq++;
+  copy.name = "新しい隊形";
+  copy.stunts.forEach(s => s.id = stuntIdSeq++);
+  frames.splice(currentFrameIdx + 1, 0, copy);
+  currentFrameIdx++;
+  renderAll();
+  snapshot("隊形追加");
+  showHint("現在の隊形をコピーして追加しました");
+});
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (confirm("最初の隊形に戻しますか？")) {
+    currentFrameIdx = 0; scrubMode = false; renderAll();
+  }
+});
+
+/* Scrub controls */
+function enterScrubAtCurrentFrame() {
+  if (!scrubMode) {
+    scrubMode = true;
+    scrubGlobalCount = globalCountForFrame(currentFrameIdx, frames[currentFrameIdx].counts);
+  }
+}
+document.getElementById("undoBtn").addEventListener("click", undoAction);
+document.getElementById("redoBtn").addEventListener("click", redoAction);
+// Keyboard shortcuts
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+    if (e.shiftKey) redoAction(); else undoAction();
+    e.preventDefault();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+    redoAction(); e.preventDefault();
+  }
+});
+
+document.getElementById("prevCountBtn").addEventListener("click", () => {
+  if (isPlaying) return;
+  enterScrubAtCurrentFrame();
+  scrubGlobalCount = Math.max(1, scrubGlobalCount - 1);
+  updateScrubUI(); renderTokens(); renderMemberControl();
+});
+document.getElementById("nextCountBtn").addEventListener("click", () => {
+  if (isPlaying) return;
+  enterScrubAtCurrentFrame();
+  scrubGlobalCount = Math.min(totalCounts(), scrubGlobalCount + 1);
+  updateScrubUI(); renderTokens(); renderMemberControl();
+});
+document.getElementById("exitScrubBtn").addEventListener("click", () => {
+  scrubMode = false;
+  updateScrubUI(); renderTokens(); renderMemberControl();
+});
+document.getElementById("splitBtn").addEventListener("click", () => {
+  if (!scrubMode) {
+    showHint("先にカウントをタップ or ◀▶でスクラブ位置を決めてください");
+    return;
+  }
+  const { frameIdx, localCount } = findFrameAtGlobalCount(scrubGlobalCount);
+  const baseFrame = frames[frameIdx];
+  if (frameIdx === 0) {
+    // Splitting frame 0 — duplicate it as frame 1 with same positions, push others
+    const copy = JSON.parse(JSON.stringify(baseFrame));
+    copy.id = frameIdSeq++;
+    copy.name = baseFrame.name + " 分割";
+    copy.counts = baseFrame.counts - localCount + 1;
+    copy.stunts.forEach(s => s.id = stuntIdSeq++);
+    baseFrame.counts = localCount;
+    frames.splice(1, 0, copy);
+    currentFrameIdx = 1;
+    showHint(`隊形を ${localCount} カウントで分割しました`);
+  } else {
+    // Insert new frame between frameIdx-1 and frameIdx with interpolated positions
+    const interp = getInterpolatedPositions(scrubGlobalCount);
+    // deep-copy positions
+    const newPositions = {};
+    Object.entries(interp).forEach(([k, v]) => { newPositions[k] = { ...v }; });
+    const newFrame = {
+      id: frameIdSeq++,
+      name: baseFrame.name + "（分割）",
+      counts: localCount,
+      positions: newPositions,
+      stunts: JSON.parse(JSON.stringify(baseFrame.stunts)),
+    };
+    newFrame.stunts.forEach(s => s.id = stuntIdSeq++);
+    // Remaining counts go to the original (now shifted) frame
+    baseFrame.counts = baseFrame.counts - localCount;
+    if (baseFrame.counts < 1) baseFrame.counts = 1;
+    frames.splice(frameIdx, 0, newFrame);
+    currentFrameIdx = frameIdx;
+    showHint(`隊形を ${localCount} カウントで分割しました`);
+  }
+  scrubMode = false;
+  renderAll();
+  snapshot("カウント分割");
+});
+
+// Mat selector
+document.querySelectorAll("#matSeg button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#matSeg button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    matMode = btn.dataset.mat;
+    fitFloor(); renderScene(); renderTokens();
+  });
+});
+
+// View selector (top vs front)
+document.querySelectorAll("#viewSeg button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#viewSeg button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    viewMode = btn.dataset.view;
+    fitFloor(); renderScene(); renderTokens();
+    showHint(viewMode === "top" ? "真上ビュー" : "正面ビュー（観客席から）");
+  });
+});
+
+// Tabs
+document.querySelectorAll(".panel-tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".panel-tabs button").forEach(b => b.classList.remove("on"));
+    document.querySelectorAll(".panel-section").forEach(s => s.classList.remove("on"));
+    btn.classList.add("on");
+    document.querySelector(`.panel-section[data-section="${btn.dataset.tab}"]`).classList.add("on");
+  });
+});
+
+document.getElementById("togglePanel").addEventListener("click", () => {
+  document.getElementById("rightPanel").classList.toggle("show-mobile");
+});
+
+document.getElementById("musicMore").addEventListener("click", () => {
+  const panel = document.getElementById("musicPanel");
+  panel.classList.toggle("collapsed");
+  const btn = document.getElementById("musicMore");
+  btn.textContent = panel.classList.contains("collapsed") ? "⚙ 詳細" : "✕ 閉じる";
+});
+
+/* Formation presets */
+const PRESETS = {
+  line: (i, n) => ({ x: 0.10 + 0.80 * (n === 1 ? 0.5 : i / (n - 1)), y: 0.55 }),
+  twoRows: (i, n) => {
+    const half = Math.ceil(n / 2);
+    const row = i < half ? 0 : 1;
+    const col = row === 0 ? i : i - half;
+    const cols = row === 0 ? half : n - half;
+    return {
+      x: 0.15 + 0.70 * (cols === 1 ? 0.5 : col / (cols - 1)),
+      y: 0.35 + row * 0.30,
+    };
+  },
+  vShape: (i, n) => {
+    const center = (n - 1) / 2;
+    const offset = i - center;
+    return {
+      x: 0.50 + offset * (0.7 / Math.max(1, n - 1)),
+      y: 0.25 + Math.abs(offset) * (0.5 / Math.max(1, center)),
+    };
+  },
+  invertedV: (i, n) => {
+    const center = (n - 1) / 2;
+    const offset = i - center;
+    return {
+      x: 0.50 + offset * (0.7 / Math.max(1, n - 1)),
+      y: 0.75 - Math.abs(offset) * (0.5 / Math.max(1, center)),
+    };
+  },
+  diamond: (i, n) => {
+    if (n === 1) return { x: 0.5, y: 0.5 };
+    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+    return {
+      x: 0.50 + 0.35 * Math.cos(angle),
+      y: 0.50 + 0.30 * Math.sin(angle),
+    };
+  },
+  circle: (i, n) => {
+    if (n === 1) return { x: 0.5, y: 0.5 };
+    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+    return {
+      x: 0.50 + 0.32 * Math.cos(angle),
+      y: 0.50 + 0.28 * Math.sin(angle),
+    };
+  },
+  triangle: (i, n) => {
+    // Pyramid shape: top is at top center, rows expand downward
+    const rows = [];
+    let count = 1, total = 0;
+    while (total < n) {
+      rows.push(Math.min(count, n - total));
+      total += count;
+      count++;
+    }
+    let cumulative = 0;
+    for (let r = 0; r < rows.length; r++) {
+      if (i < cumulative + rows[r]) {
+        const idxInRow = i - cumulative;
+        const widthAtRow = rows[r];
+        return {
+          x: 0.50 + (widthAtRow === 1 ? 0 : (idxInRow - (widthAtRow - 1) / 2) * (0.6 / Math.max(1, rows.length - 1))),
+          y: 0.25 + r * (0.50 / Math.max(1, rows.length - 1)),
+        };
+      }
+      cumulative += rows[r];
+    }
+    return { x: 0.5, y: 0.5 };
+  },
+  grid: (i, n) => {
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    return {
+      x: 0.15 + 0.70 * (cols === 1 ? 0.5 : c / (cols - 1)),
+      y: 0.25 + 0.50 * (rows === 1 ? 0.5 : r / (rows - 1)),
+    };
+  },
+};
+function applyPreset(name) {
+  const fn = PRESETS[name];
+  if (!fn) return;
+  const f = frames[currentFrameIdx];
+  members.forEach((m, i) => {
+    const p = fn(i, members.length);
+    const pos = f.positions[m.id] || { level: "ground", bodyPos: "basic" };
+    pos.x = Math.max(0.05, Math.min(0.95, p.x));
+    pos.y = Math.max(0.10, Math.min(0.90, p.y));
+    f.positions[m.id] = pos;
+  });
+  renderTokens();
+  snapshot("配置プリセット");
+  showHint("配置を適用しました");
+}
+document.getElementById("presetBtn").addEventListener("click", () => {
+  document.getElementById("presetMenu").classList.add("show");
+  document.getElementById("presetOverlay").classList.add("show");
+});
+document.getElementById("presetOverlay").addEventListener("click", () => {
+  document.getElementById("presetMenu").classList.remove("show");
+  document.getElementById("presetOverlay").classList.remove("show");
+});
+document.querySelectorAll("#presetMenu button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    applyPreset(btn.dataset.preset);
+    document.getElementById("presetMenu").classList.remove("show");
+    document.getElementById("presetOverlay").classList.remove("show");
+  });
+});
+
+/* Help modal */
+const helpModal = document.getElementById("helpModal");
+document.getElementById("helpBtn").addEventListener("click", () => {
+  helpModal.classList.add("show");
+});
+document.getElementById("helpClose").addEventListener("click", () => {
+  helpModal.classList.remove("show");
+});
+helpModal.addEventListener("click", e => {
+  if (e.target === helpModal) helpModal.classList.remove("show");
+});
+
+/* Share to LINE / native share */
+document.getElementById("shareBtn").addEventListener("click", async () => {
+  const url = window.location.href;
+  const title = "Cheer Choreo - 振付アプリβ版";
+  const text = "チアの振付アプリを試してみませんか？スマホ／iPadで動きます🌟";
+  // Try native share first (mobile)
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text, url });
+      return;
+    } catch (e) { /* user cancelled */ }
+  }
+  // Fallback: LINE share URL (works on mobile and desktop)
+  if (url.startsWith("file://") || url.startsWith("about:")) {
+    showHint("先にURL化してください（Netlify Drop等）");
+    return;
+  }
+  const lineUrl = "https://social-plugins.line.me/lineit/share?url=" + encodeURIComponent(url);
+  window.open(lineUrl, "_blank", "noopener,width=600,height=600");
+});
+
+window.addEventListener("resize", () => { fitFloor(); renderScene(); renderTokens(); });
+
+/* ======== Member Control Card ======== */
+const memberControl = document.getElementById("memberControl");
+let lastMcShown = false;
+function refitAfterMcToggle() {
+  // Called after member control visibility changes — resize floor and reposition tokens
+  requestAnimationFrame(() => {
+    fitFloor();
+    const r = floor.getBoundingClientRect();
+    const f = getDisplayFrame();
+    floor.querySelectorAll(".token").forEach(tok => {
+      const id = +tok.dataset.id;
+      const pos = f.positions[id];
+      if (pos) placeToken(tok, pos.x, pos.y);
+    });
+    floor.querySelectorAll(".figure").forEach(fig => {
+      const id = +fig.dataset.id;
+      const pos = f.positions[id];
+      if (pos) applyFigureVisualPosition(fig, pos, r);
+    });
+  });
+}
+function renderMemberControl() {
+  if (!selectedMemberId || isPlaying || scrubMode) {
+    memberControl.classList.remove("show");
+    memberControl.innerHTML = "";
+    floor.classList.remove("has-selection", "tap-move-active");
+    document.querySelector(".tap-move-banner")?.remove();
+    if (lastMcShown) { lastMcShown = false; refitAfterMcToggle(); }
+    return;
+  }
+  const m = members.find(x => x.id === selectedMemberId);
+  if (!m) {
+    selectedMemberId = null;
+    memberControl.classList.remove("show");
+    floor.classList.remove("has-selection");
+    return;
+  }
+  const f = frames[currentFrameIdx];
+  const pos = f.positions[m.id];
+  if (!pos) return;
+  const showBP = (pos.level !== "ground");
+  const isTop = (m.role === "top");
+  const inStunt = f.stunts.some(s => s.topId === m.id);
+  const canAddStunt = isTop && !inStunt;
+  const memberInAnyStunt = !!getStuntForMember(m.id, f);
+  memberControl.innerHTML = `
+    <span class="mc-name">${m.name}</span>
+    <span class="mc-role-badge" style="background:${ROLES[m.role].color}">${ROLES[m.role].label}</span>
+    <div class="mc-row">
+      <span class="mc-label">役割:</span>
+      <select class="mc-select" id="mcRoleSel">
+        ${Object.entries(ROLES).map(([k,v]) => `<option value="${k}" ${k===m.role?"selected":""}>${v.label}</option>`).join("")}
+      </select>
+    </div>
+    <div class="mc-row">
+      <span class="mc-label">高さ:</span>
+      <button class="mc-btn ${pos.level==="ground"?"on":""}" data-level="ground">地上</button>
+      <button class="mc-btn ${pos.level==="shoulder"?"on":""}" data-level="shoulder">肩</button>
+      <button class="mc-btn ${pos.level==="extension"?"on":""}" data-level="extension">エクステンション</button>
+    </div>
+    ${showBP ? `<div class="mc-row">
+      <span class="mc-label">技:</span>
+      <select class="mc-select" id="mcBodyPosSel">
+        ${Object.entries(BODY_POSITIONS).map(([k,v]) => `<option value="${k}" ${pos.bodyPos===k?"selected":""}>${v.label}</option>`).join("")}
+      </select>
+    </div>` : ""}
+    <div class="mc-row">
+      <span class="mc-label">微調整:</span>
+      <button class="mc-nudge" data-dir="left">←</button>
+      <button class="mc-nudge" data-dir="up">↑</button>
+      <button class="mc-nudge" data-dir="down">↓</button>
+      <button class="mc-nudge" data-dir="right">→</button>
+    </div>
+    <button class="mc-btn ${tapToMoveActive?"warn":""}" id="mcTapMove">📍 タップで移動${tapToMoveActive?" (ON)":""}</button>
+    ${memberInAnyStunt ? `<button class="mc-btn ${groupMoveActive?"on":""}" id="mcGroupMove" title="スタンツのメンバー全員が一緒に動く">🔗 連動移動 ${groupMoveActive?"ON":"OFF"}</button>` : ""}
+    ${canAddStunt ? `<button class="mc-btn warn" id="mcAddStunt">＋ スタンツ作成</button>` : ""}
+    ${isTop && inStunt ? `<button class="mc-btn danger" id="mcRemoveStunt">スタンツ解除</button>` : ""}
+    <button class="mc-btn danger" id="mcDeselect">✕ 解除</button>
+  `;
+  memberControl.classList.add("show");
+  floor.classList.add("has-selection");
+  floor.classList.toggle("tap-move-active", tapToMoveActive);
+  if (!lastMcShown) { lastMcShown = true; refitAfterMcToggle(); }
+
+  // Wire up handlers
+  memberControl.querySelector("#mcRoleSel").addEventListener("change", e => {
+    m.role = e.target.value; renderRoster(); renderTokens(); renderMemberControl();
+    snapshot("役割変更");
+  });
+  memberControl.querySelectorAll("[data-level]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      pos.level = btn.dataset.level;
+      if (pos.level === "ground") pos.bodyPos = "basic";
+      renderTokens(); renderMemberControl();
+      snapshot("高さ変更");
+      showHint("高さ: " + (pos.level === "ground" ? "地上" : pos.level === "shoulder" ? "肩" : "エクステンション"));
+    });
+  });
+  if (showBP) {
+    memberControl.querySelector("#mcBodyPosSel").addEventListener("change", e => {
+      pos.bodyPos = e.target.value;
+      renderTokens(); renderStunts();
+      snapshot("ボディポジション変更");
+    });
+  }
+  memberControl.querySelectorAll(".mc-nudge").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const step = 0.02;
+      switch (btn.dataset.dir) {
+        case "left":  pos.x = Math.max(0.03, pos.x - step); break;
+        case "right": pos.x = Math.min(0.97, pos.x + step); break;
+        case "up":    pos.y = Math.max(0.02, pos.y - step); break;
+        case "down":  pos.y = Math.min(0.98, pos.y + step); break;
+      }
+      renderTokens();
+      snapshot("微調整");
+    });
+  });
+  memberControl.querySelector("#mcTapMove").addEventListener("click", () => {
+    tapToMoveActive = !tapToMoveActive;
+    renderMemberControl();
+    document.querySelector(".tap-move-banner")?.remove();
+    if (tapToMoveActive) {
+      const banner = document.createElement("div");
+      banner.className = "tap-move-banner";
+      banner.textContent = "📍 フロアの行き先をタップ";
+      floor.parentElement.appendChild(banner);
+    }
+  });
+  memberControl.querySelector("#mcDeselect").addEventListener("click", () => {
+    selectedMemberId = null;
+    tapToMoveActive = false;
+    renderTokens(); renderMemberControl();
+  });
+  const addStuntBtn = memberControl.querySelector("#mcAddStunt");
+  if (addStuntBtn) addStuntBtn.addEventListener("click", () => createStuntForSelected());
+  const removeStuntBtn = memberControl.querySelector("#mcRemoveStunt");
+  if (removeStuntBtn) removeStuntBtn.addEventListener("click", () => removeStuntForSelected());
+  const groupMoveBtn = memberControl.querySelector("#mcGroupMove");
+  if (groupMoveBtn) groupMoveBtn.addEventListener("click", () => {
+    groupMoveActive = !groupMoveActive;
+    renderMemberControl();
+    showHint(groupMoveActive ? "スタンツ連動移動 ON" : "個別移動モード（連動OFF）");
+  });
+}
+
+/* Helpers used by both right panel button and operation card */
+function createStuntForSelected() {
+  const top = members.find(m => m.id === selectedMemberId);
+  if (!top || top.role !== "top") {
+    showHint("トップ役のメンバーを選んでから押してください");
+    return;
+  }
+  const f = frames[currentFrameIdx];
+  if (f.stunts.find(s => s.topId === top.id)) {
+    showHint("そのトップは既にスタンツに登録されています");
+    return;
+  }
+  const bases = members.filter(m => m.role === "base");
+  const spotter = members.find(m => m.role === "spotter");
+  const backspot = members.find(m => m.role === "backspot");
+  const topPos = f.positions[top.id];
+  // Sort bases by distance to top
+  bases.sort((a,b) => {
+    const pa = f.positions[a.id], pb = f.positions[b.id];
+    const da = Math.hypot(pa.x - topPos.x, pa.y - topPos.y);
+    const db = Math.hypot(pb.x - topPos.x, pb.y - topPos.y);
+    return da - db;
+  });
+  if (bases.length < 2) {
+    showHint("ベース役のメンバーが2人以上必要です");
+    return;
+  }
+  const newS = {
+    id: stuntIdSeq++, type: "extension",
+    topId: top.id,
+    baseIds: bases.slice(0, 2).map(b => b.id),
+    spotterId: spotter ? spotter.id : null,
+    backspotId: backspot ? backspot.id : null,
+  };
+  f.stunts.push(newS);
+  topPos.level = "extension";
+  renderStunts(); renderTokens(); renderScore(); renderMemberControl();
+  snapshot("スタンツ作成");
+  showHint("エクステンションを追加しました");
+}
+function removeStuntForSelected() {
+  const f = frames[currentFrameIdx];
+  const stunt = f.stunts.find(s => s.topId === selectedMemberId);
+  if (!stunt) return;
+  const pos = f.positions[stunt.topId];
+  if (pos) { pos.level = "ground"; pos.bodyPos = "basic"; }
+  f.stunts = f.stunts.filter(s => s.id !== stunt.id);
+  renderStunts(); renderTokens(); renderScore(); renderMemberControl();
+  snapshot("スタンツ解除");
+  showHint("スタンツを解除しました");
+}
+
+/* Floor click for tap-to-move */
+floor.addEventListener("click", e => {
+  if (isPlaying || scrubMode) return;
+  if (!selectedMemberId) return;
+  if (e.target.closest(".token, .figure")) return;
+  if (!tapToMoveActive) return;
+  const r = floor.getBoundingClientRect();
+  const f = frames[currentFrameIdx];
+  const pos = f.positions[selectedMemberId];
+  if (!pos) return;
+  let nx, ny;
+  if (viewMode === "top") {
+    nx = (e.clientX - r.left) / r.width;
+    ny = (e.clientY - r.top) / r.height;
+  } else {
+    nx = (e.clientX - r.left) / r.width;
+    const horizon = 0.45, stagePart = 0.55;
+    const myFoot = (e.clientY - r.top) / r.height;
+    ny = (myFoot - horizon) / stagePart;
+  }
+  nx = Math.max(0.03, Math.min(0.97, nx));
+  ny = Math.max(0.02, Math.min(0.98, ny));
+  const oldX = pos.x, oldY = pos.y;
+  pos.x = nx; pos.y = ny;
+  // Group move if in stunt
+  moveStuntGroupBy(selectedMemberId, nx - oldX, ny - oldY, f);
+  tapToMoveActive = false;
+  document.querySelector(".tap-move-banner")?.remove();
+  renderTokens(); renderMemberControl();
+  snapshot("タップ移動");
+  showHint("移動完了！");
+});
+
+/* ======== Init ======== */
+function renderAll() {
+  fitFloor(); renderScene(); renderRoster(); renderTokens();
+  renderStunts(); renderScore(); renderTimeline(); renderCountBar();
+  updateScrubUI(); renderMemberControl();
+}
+requestAnimationFrame(() => {
+  renderAll();
+  // Initial snapshot for undo baseline
+  snapshot("初期状態");
+  setTimeout(() => showHint("メンバーをドラッグで配置 ／ ダブルタップで高さ変更"), 400);
+});
+</script>
+</body>
+</html>
