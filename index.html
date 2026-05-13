@@ -1666,11 +1666,14 @@ function fitFloor() {
   }
   floor.style.width = w + "px";
   floor.style.height = h + "px";
-  // Dynamically size tokens (top view circles)
-  const tokenSize = Math.max(26, Math.min(48, w * 0.075));
+  // Dynamically size tokens (top view circles) — マット1本の幅に対する比率で決める。
+  // モバイル（細いフロア）では従来より小さく、デスクトップでは見やすい上限まで。
+  // 最低 22px は名前文字が辛うじて読める下限。
+  const stripWidth = w / cfg.count;
+  const tokenSize = Math.max(22, Math.min(48, stripWidth * 0.62));
   floor.style.setProperty("--token-size", tokenSize + "px");
   // Dynamically size figures (front view human silhouettes)
-  figureHeight = Math.max(46, Math.min(76, w * 0.13));
+  figureHeight = Math.max(38, Math.min(76, stripWidth * 1.1));
 }
 
 /* ======== Scene rendering (top vs front) ======== */
