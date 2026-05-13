@@ -38,7 +38,7 @@
 | `HANDOFF_GUIDE.md` | チーム編成・運営ガイド |
 | `marketing_plan.md` | 市場分析・販売戦略 |
 | `操作チートシート.md` | β版ユーザー向け操作ガイド |
-| `demo/` | 現行β版（単一HTMLファイル） |
+| `index.html` | 現行β版（単一HTMLファイル、GitHub Pages 配信） |
 | `app/` | Next.js アプリケーション（Phase1以降） |
 | `components/` | React コンポーネント |
 | `lib/` | ユーティリティ・ロジック |
@@ -76,7 +76,7 @@ npm run dev
 
 ### β版の確認（現状）
 
-`demo/cheer_choreo_demo.html` をブラウザにドラッグ&ドロップするだけで動きます（追加セットアップ不要）。
+`index.html` をブラウザにドラッグ&ドロップするだけで動きます（追加セットアップ不要）。
 
 ---
 

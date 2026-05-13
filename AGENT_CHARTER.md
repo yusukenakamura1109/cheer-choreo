@@ -309,7 +309,7 @@ Claude Code は以下を自己管理してください：
 
 ---
 
-## 12. このChater自体の改訂
+## 12. このCharter自体の改訂
 
 - 軽微な誤字・補強：自由に PR で改訂
 - 権限レベル（GREEN/YELLOW/RED）の境界変更：Supervisor 承認必須

@@ -32,8 +32,9 @@
 
 ## 2. 現在の状態（重要）
 
-### `/demo/cheer_choreo_demo.html`
-**単一のHTMLファイルで動く体験版（β版）です。** 約 4,000 行・自己完結型（外部依存ゼロ）。
+### `index.html`（リポジトリ直下）
+**単一のHTMLファイルで動く体験版（β版）です。** 約 3,143 行・自己完結型（外部依存ゼロ）。
+※ 旧文書では `demo/cheer_choreo_demo.html` と表記されていましたが、GitHub Pages 配信のためルートに `index.html` としてリネーム済み。
 - すべての機能はクライアントサイド JavaScript で実装
 - データは**ブラウザのメモリ上のみ**（リロードで消える）
 - 認証・データベース・サーバーサイドのロジック **なし**
@@ -94,8 +95,7 @@ cheer-choreo/
 ├── ROADMAP.md             # 開発フェーズ
 ├── HANDOFF_GUIDE.md       # 非エンジニア向け運用ガイド
 ├── marketing_plan.md      # マーケ計画
-├── demo/
-│   └── cheer_choreo_demo.html  # 現行β版（リファレンス）
+├── index.html             # 現行β版（リファレンス、GitHub Pages 配信）
 ├── app/                   # Next.js App Router
 │   ├── (auth)/            # ログイン・サインアップ
 │   ├── (dashboard)/       # ダッシュボード
@@ -255,7 +255,7 @@ npm run dev
 - `HANDOFF_GUIDE.md` - チーム編成・運営
 - `marketing_plan.md` - 市場分析・販売戦略
 - `操作チートシート.md` - β版の操作方法（ユーザー向け）
-- `demo/cheer_choreo_demo.html` - リファレンス実装
+- `index.html` - リファレンス実装（GitHub Pages 配信中のβ版）
 
 外部：
 - Firebase Console: https://console.firebase.google.com/
