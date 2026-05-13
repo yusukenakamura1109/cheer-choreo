@@ -710,6 +710,26 @@
     text-align: center;
     margin: 4px 0;
   }
+  /* Snap toggle button */
+  .btn.snap-toggle {
+    transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  }
+  .btn.snap-toggle.on {
+    background: rgba(110, 211, 255, 0.18);
+    border-color: var(--accent-2);
+    color: var(--accent-2);
+  }
+  .btn.snap-toggle:not(.on) {
+    opacity: 0.55;
+  }
+  /* Snap pulse feedback on token */
+  .token.snap-pulse, .figure.snap-pulse {
+    animation: snapPulse 0.22s ease-out;
+  }
+  @keyframes snapPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(110, 211, 255, 0.85); }
+    100% { box-shadow: 0 0 0 14px rgba(110, 211, 255, 0); }
+  }
   .help-content h2 {
     color: var(--accent); margin: 0 0 14px; font-size: 17px;
   }
@@ -859,6 +879,7 @@
       <button class="btn" id="addMember">＋メンバー</button>
       <button class="btn" id="addFrame">＋隊形</button>
       <button class="btn" id="presetBtn" title="フォーメーションのプリセット">📐 配置</button>
+      <button class="btn snap-toggle on" id="snapBtn" title="マットの線・中央にスナップ（吸い付き）">🧲 スナップ</button>
       <button class="btn primary" id="playBtn">▶ 再生</button>
       <button class="btn" id="shareBtn" title="LINEで共有">📤 共有</button>
       <button class="btn" id="helpBtn" title="使い方ガイド">❓ ヘルプ</button>
@@ -1027,10 +1048,16 @@
     <div class="help-item">切替：画面下のタイムラインの <span class="help-key">隊形カード</span> をタップ</div>
     <div class="help-item">追加：ヘッダーの <span class="help-key">+ 隊形</span>（現在の隊形がコピーされる）</div>
 
-    <h3>⏯ 1カウントずつ確認・編集</h3>
-    <div class="help-item"><span class="help-key">◀ ▶</span> で1カウントずつ進める／戻す</div>
-    <div class="help-item">任意のカウント位置で <span class="help-key">✂ ここで分割</span> → 中間の隊形を作成</div>
+    <h3>⏯ 1カウントずつ動きを決める</h3>
+    <div class="help-item"><span class="help-key">◀ ▶</span> で1カウントずつ進める／戻す（スクラブモード）</div>
+    <div class="help-item">スクラブ中にメンバーを <b>タップ／ドラッグ</b> → 自動でその位置に分割され、新しい隊形を編集できます</div>
+    <div class="help-item">明示的に分割したい場合は <span class="help-key">✂ ここで分割</span> ボタン</div>
     <div class="help-item">スクラブを抜けるには <span class="help-key">終了</span> または タイムラインの隊形をタップ</div>
+
+    <h3>🧲 スナップ（マットの線・中央に吸い付き）</h3>
+    <div class="help-item">ヘッダーの <span class="help-key">🧲 スナップ</span>（既定 ON）：</div>
+    <div class="help-item">メンバーをドラッグ／タップ移動すると、マットの<b>境界線</b>や<b>各マットの中央</b>付近で「カチ」と吸い付きます</div>
+    <div class="help-tip">💡 自由配置したいときはボタンを再タップで OFF にできます</div>
 
     <h3>▶️ 再生</h3>
     <div class="help-item">ヘッダーの <span class="help-key">▶ 再生</span> → 隊形遷移と音源を同期再生</div>
@@ -1328,6 +1355,78 @@ function flashSavedIndicator(label) {
   flashSavedIndicator._t = setTimeout(() => el.classList.remove("show"), 1400);
 }
 
+/* ======== Snap to grid (mat lines & mat centers) ======== */
+let snapEnabled = true;
+const SNAP_THRESHOLD = 0.012; // normalized x の閾値（マット幅の約11%まで吸い込む≒指の誤差を許容）
+
+function getSnapXs(mode) {
+  const n = MAT_CONFIGS[mode].count;
+  const pts = [];
+  for (let i = 0; i <= n; i++) pts.push(i / n);           // マット境界線
+  for (let i = 0; i < n; i++)  pts.push((i + 0.5) / n);   // 各マットの中央
+  return pts;
+}
+
+function snapXValue(x, mode) {
+  if (!snapEnabled) return { x, snapped: false };
+  const pts = getSnapXs(mode || matMode);
+  let best = x, bestDist = SNAP_THRESHOLD, hit = false;
+  for (const p of pts) {
+    const d = Math.abs(x - p);
+    if (d < bestDist) { bestDist = d; best = p; hit = true; }
+  }
+  return { x: best, snapped: hit };
+}
+
+function applySnap(x, y) {
+  // 縦軸（観客方向）はチアの慣習上スナップしない。横軸のみ。
+  return snapXValue(x);
+}
+
+function flashSnapOnToken(tok) {
+  if (!tok || !tok.classList) return;
+  tok.classList.add("snap-pulse");
+  clearTimeout(tok._snapTimer);
+  tok._snapTimer = setTimeout(() => tok.classList.remove("snap-pulse"), 220);
+}
+
+/* ======== Scrub helpers: auto-split for 1-count editing ======== */
+function splitAtScrubPosition() {
+  // スクラブ中の現在位置で隊形を分割し、新しい隊形を currentFrameIdx にする。
+  // 戻り値：分割した localCount（成功時）／null（非スクラブ時）
+  if (!scrubMode) return null;
+  const { frameIdx, localCount } = findFrameAtGlobalCount(scrubGlobalCount);
+  const baseFrame = frames[frameIdx];
+  if (frameIdx === 0) {
+    const copy = JSON.parse(JSON.stringify(baseFrame));
+    copy.id = frameIdSeq++;
+    copy.name = baseFrame.name + " 分割";
+    copy.counts = baseFrame.counts - localCount + 1;
+    copy.stunts.forEach(s => s.id = stuntIdSeq++);
+    baseFrame.counts = localCount;
+    frames.splice(1, 0, copy);
+    currentFrameIdx = 1;
+  } else {
+    const interp = getInterpolatedPositions(scrubGlobalCount);
+    const newPositions = {};
+    Object.entries(interp).forEach(([k, v]) => { newPositions[k] = { ...v }; });
+    const newFrame = {
+      id: frameIdSeq++,
+      name: baseFrame.name + "（分割）",
+      counts: localCount,
+      positions: newPositions,
+      stunts: JSON.parse(JSON.stringify(baseFrame.stunts)),
+    };
+    newFrame.stunts.forEach(s => s.id = stuntIdSeq++);
+    baseFrame.counts = baseFrame.counts - localCount;
+    if (baseFrame.counts < 1) baseFrame.counts = 1;
+    frames.splice(frameIdx, 0, newFrame);
+    currentFrameIdx = frameIdx;
+  }
+  scrubMode = false;
+  return localCount;
+}
+
 /* ======== Persistence: localStorage / URL / JSON ======== */
 const STORAGE_KEY = "cheer-choreo-state-v1";
 const URL_HASH_KEY = "s";
@@ -1336,7 +1435,7 @@ const STATE_SCHEMA_VERSION = 1;
 function serializeFullState() {
   return {
     v: STATE_SCHEMA_VERSION,
-    matMode, viewMode,
+    matMode, viewMode, snapEnabled,
     bpm, audioOffset, playbackRate, loopStart, loopEnd,
     memberIdSeq, frameIdSeq, stuntIdSeq,
     members: JSON.parse(JSON.stringify(members)),
@@ -1355,6 +1454,7 @@ function applyFullState(s) {
   if (!Array.isArray(s.members) || !Array.isArray(s.frames) || s.frames.length === 0) return false;
   matMode = (s.matMode === "jca") ? "jca" : "usa";
   viewMode = (s.viewMode === "front") ? "front" : "top";
+  snapEnabled = (s.snapEnabled !== false); // 未指定なら ON
   bpm = Number(s.bpm) || 120;
   audioOffset = Number(s.audioOffset) || 0;
   playbackRate = Number(s.playbackRate) || 1.0;
@@ -1375,6 +1475,8 @@ function applyFullState(s) {
   });
   const bpmInput = document.getElementById("bpmInput");
   if (bpmInput) bpmInput.value = bpm;
+  const snapBtn = document.getElementById("snapBtn");
+  if (snapBtn) snapBtn.classList.toggle("on", snapEnabled);
   return true;
 }
 
@@ -2010,7 +2112,15 @@ function enableDragFront(fig) {
   let startX = 0, startY = 0;
   fig.addEventListener("pointerdown", e => {
     if (isPlaying) return;
-    if (scrubMode) { showHint("スクラブ中は編集できません。「終了」または「ここで分割」を押してください"); return; }
+    if (scrubMode) {
+      const lc = splitAtScrubPosition();
+      if (lc !== null) {
+        renderAll();
+        snapshot("カウント分割");
+        showHint(`✂ カウント ${lc} で分割しました。もう一度ドラッグして編集してください`);
+      }
+      return;
+    }
     dragging = true; moved = false;
     pointerId = e.pointerId;
     startX = e.clientX; startY = e.clientY;
@@ -2029,6 +2139,9 @@ function enableDragFront(fig) {
     let y = (myFoot - horizon) / stagePart;
     x = Math.max(0.03, Math.min(0.97, x));
     y = Math.max(0.02, Math.min(0.98, y));
+    const snap = applySnap(x, y);
+    if (snap.snapped) flashSnapOnToken(fig);
+    x = snap.x;
     const id = +fig.dataset.id;
     const pos = frames[currentFrameIdx].positions[id];
     const oldX = pos.x, oldY = pos.y;
@@ -2128,7 +2241,15 @@ function enableDrag(tok) {
   let startX = 0, startY = 0;
   tok.addEventListener("pointerdown", e => {
     if (isPlaying) return;
-    if (scrubMode) { showHint("スクラブ中は編集できません。「終了」または「ここで分割」を押してください"); return; }
+    if (scrubMode) {
+      const lc = splitAtScrubPosition();
+      if (lc !== null) {
+        renderAll();
+        snapshot("カウント分割");
+        showHint(`✂ カウント ${lc} で分割しました。もう一度ドラッグして編集してください`);
+      }
+      return;
+    }
     dragging = true; moved = false;
     pointerId = e.pointerId;
     downTime = Date.now();
@@ -2146,6 +2267,9 @@ function enableDrag(tok) {
     let y = (e.clientY - r.top) / r.height;
     x = Math.max(0.03, Math.min(0.97, x));
     y = Math.max(0.05, Math.min(0.95, y));
+    const snap = applySnap(x, y);
+    if (snap.snapped) flashSnapOnToken(tok);
+    x = snap.x;
     const id = +tok.dataset.id;
     const pos = frames[currentFrameIdx].positions[id];
     const oldX = pos.x, oldY = pos.y;
@@ -2869,43 +2993,11 @@ document.getElementById("splitBtn").addEventListener("click", () => {
     showHint("先にカウントをタップ or ◀▶でスクラブ位置を決めてください");
     return;
   }
-  const { frameIdx, localCount } = findFrameAtGlobalCount(scrubGlobalCount);
-  const baseFrame = frames[frameIdx];
-  if (frameIdx === 0) {
-    // Splitting frame 0 — duplicate it as frame 1 with same positions, push others
-    const copy = JSON.parse(JSON.stringify(baseFrame));
-    copy.id = frameIdSeq++;
-    copy.name = baseFrame.name + " 分割";
-    copy.counts = baseFrame.counts - localCount + 1;
-    copy.stunts.forEach(s => s.id = stuntIdSeq++);
-    baseFrame.counts = localCount;
-    frames.splice(1, 0, copy);
-    currentFrameIdx = 1;
-    showHint(`隊形を ${localCount} カウントで分割しました`);
-  } else {
-    // Insert new frame between frameIdx-1 and frameIdx with interpolated positions
-    const interp = getInterpolatedPositions(scrubGlobalCount);
-    // deep-copy positions
-    const newPositions = {};
-    Object.entries(interp).forEach(([k, v]) => { newPositions[k] = { ...v }; });
-    const newFrame = {
-      id: frameIdSeq++,
-      name: baseFrame.name + "（分割）",
-      counts: localCount,
-      positions: newPositions,
-      stunts: JSON.parse(JSON.stringify(baseFrame.stunts)),
-    };
-    newFrame.stunts.forEach(s => s.id = stuntIdSeq++);
-    // Remaining counts go to the original (now shifted) frame
-    baseFrame.counts = baseFrame.counts - localCount;
-    if (baseFrame.counts < 1) baseFrame.counts = 1;
-    frames.splice(frameIdx, 0, newFrame);
-    currentFrameIdx = frameIdx;
-    showHint(`隊形を ${localCount} カウントで分割しました`);
-  }
-  scrubMode = false;
+  const lc = splitAtScrubPosition();
+  if (lc === null) return;
   renderAll();
   snapshot("カウント分割");
+  showHint(`隊形を ${lc} カウントで分割しました`);
 });
 
 // Mat selector
@@ -2929,6 +3021,14 @@ document.querySelectorAll("#viewSeg button").forEach(btn => {
     showHint(viewMode === "top" ? "真上ビュー" : "正面ビュー（観客席から）");
     scheduleAutoSave();
   });
+});
+
+// Snap toggle (mat lines & mat centers)
+document.getElementById("snapBtn").addEventListener("click", () => {
+  snapEnabled = !snapEnabled;
+  document.getElementById("snapBtn").classList.toggle("on", snapEnabled);
+  showHint(snapEnabled ? "🧲 スナップ ON：マットの線・中央に吸い付きます" : "スナップ OFF：自由に配置できます");
+  scheduleAutoSave();
 });
 
 // Tabs
@@ -3387,6 +3487,8 @@ floor.addEventListener("click", e => {
   }
   nx = Math.max(0.03, Math.min(0.97, nx));
   ny = Math.max(0.02, Math.min(0.98, ny));
+  const snap = applySnap(nx, ny);
+  nx = snap.x;
   const oldX = pos.x, oldY = pos.y;
   pos.x = nx; pos.y = ny;
   // Group move if in stunt
