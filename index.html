@@ -703,6 +703,13 @@
     width: 32px; height: 32px;
   }
   .help-close:hover { color: var(--text); }
+  .share-action {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 14px;
+    text-align: center;
+    margin: 4px 0;
+  }
   .help-content h2 {
     color: var(--accent); margin: 0 0 14px; font-size: 17px;
   }
@@ -1038,17 +1045,59 @@
     <div class="help-item"><span class="help-key">JCA(7)</span>：7マット（4本目が中央）</div>
 
     <h3>📤 共有・配布</h3>
-    <div class="help-item">ヘッダーの <span class="help-key">📤 共有</span> → LINEなどで現在のURLを共有</div>
+    <div class="help-item">ヘッダーの <span class="help-key">📤 共有</span> をタップすると 4つの方法が選べます：</div>
+    <div class="help-item">① <b>URL コピー</b>：振付データを丸ごと URL に埋め込んでコピー。誰にでも送れる</div>
+    <div class="help-item">② <b>LINE で送る</b>：URL を LINE のシェアダイアログで送信</div>
+    <div class="help-item">③ <b>JSON 書き出し</b>：ファイルでバックアップ／別端末への持ち運び</div>
+    <div class="help-item">④ <b>JSON 読み込み</b>：保存したファイルから振付を復元</div>
 
     <h3>❓ 困った時</h3>
     <div class="help-item">人が動かない → 画面を一度<b>再読み込み</b>（更新ボタン）</div>
     <div class="help-item">操作カードが画面を圧迫 → カードの <span class="help-key">✕ 解除</span></div>
     <div class="help-item">スクラブから戻る → <span class="help-key">終了</span> ボタン</div>
     <div class="help-item">音源が再生されない → 画面を一度タップしてから ▶ 再生（iOS制限）</div>
+    <div class="help-item">保存データを消したい → <span class="help-key">📤 共有</span> →「保存データを削除してサンプルに戻す」</div>
 
     <div class="help-tip" style="margin-top:16px">
-      ⚠️ <b>β版の注意</b>：編集内容はリロードで消えます。本番投入前は動画録画・スクショで残してください。
+      💾 <b>自動保存対応</b>：編集内容はこの端末（ブラウザ）に自動保存されます。リロードしても消えません。<br />
+      ※ 別端末で続きを作るときは <span class="help-key">📤 共有</span> から URL or JSON で持ち運んでください。
     </div>
+  </div>
+</div>
+
+<!-- Share & Data modal -->
+<div class="help-modal" id="shareModal">
+  <div class="help-content">
+    <button class="help-close" id="shareClose" aria-label="閉じる">×</button>
+    <h2>📤 共有・データ管理</h2>
+
+    <h3>🔗 リンクで共有</h3>
+    <div class="help-item">
+      <button class="btn primary share-action" id="copyLinkBtn">🔗 振付入り URL をコピー</button>
+    </div>
+    <div class="help-tip">URL に振付の全データが入っています。LINE・メール・Slack 等で誰にでも送れます。受け取った人は URL を開くだけで同じ振付を見られます。</div>
+
+    <div class="help-item" style="margin-top:10px">
+      <button class="btn share-action" id="lineShareBtn">📱 LINE で送る</button>
+    </div>
+
+    <h3>💾 ファイルで保存・受け渡し</h3>
+    <div class="help-item">
+      <button class="btn share-action" id="exportJsonBtn">💾 JSON ファイルで書き出し</button>
+    </div>
+    <div class="help-tip">この振付をバックアップ／別端末への持ち運び用に保存します。ダウンロードフォルダに <code>cheer-choreo-YYYY-MM-DD-HH-mm.json</code> が保存されます。</div>
+
+    <div class="help-item" style="margin-top:10px">
+      <button class="btn share-action" id="importJsonBtn">📂 JSON ファイルから読み込み</button>
+      <input type="file" id="jsonFileInput" accept="application/json,.json" hidden />
+    </div>
+    <div class="help-tip">⚠️ 現在編集中の振付は上書きされます。</div>
+
+    <h3>🗑 端末の保存データを消去</h3>
+    <div class="help-item">
+      <button class="btn ghost share-action" id="clearStoredBtn">🗑 保存データを削除してサンプルに戻す</button>
+    </div>
+    <div class="help-tip">この端末のブラウザに保存された振付を完全に消去し、初期サンプル（3 隊形）に戻します。</div>
   </div>
 </div>
 
@@ -1237,6 +1286,7 @@ function snapshot(label) {
   historyIdx = history.length - 1;
   updateUndoRedoButtons();
   flashSavedIndicator(label);
+  scheduleAutoSave();
 }
 function applyHistoryAt(idx) {
   const snap = history[idx];
@@ -1276,6 +1326,154 @@ function flashSavedIndicator(label) {
   el.classList.add("show");
   clearTimeout(flashSavedIndicator._t);
   flashSavedIndicator._t = setTimeout(() => el.classList.remove("show"), 1400);
+}
+
+/* ======== Persistence: localStorage / URL / JSON ======== */
+const STORAGE_KEY = "cheer-choreo-state-v1";
+const URL_HASH_KEY = "s";
+const STATE_SCHEMA_VERSION = 1;
+
+function serializeFullState() {
+  return {
+    v: STATE_SCHEMA_VERSION,
+    matMode, viewMode,
+    bpm, audioOffset, playbackRate, loopStart, loopEnd,
+    memberIdSeq, frameIdSeq, stuntIdSeq,
+    members: JSON.parse(JSON.stringify(members)),
+    frames: JSON.parse(JSON.stringify(frames)),
+    currentFrameIdx,
+    savedAt: new Date().toISOString(),
+  };
+}
+
+function applyFullState(s) {
+  if (!s || typeof s !== "object") return false;
+  if (s.v && s.v !== STATE_SCHEMA_VERSION) {
+    console.warn("[Cheer Choreo] 未知のスキーマ:", s.v);
+    return false;
+  }
+  if (!Array.isArray(s.members) || !Array.isArray(s.frames) || s.frames.length === 0) return false;
+  matMode = (s.matMode === "jca") ? "jca" : "usa";
+  viewMode = (s.viewMode === "front") ? "front" : "top";
+  bpm = Number(s.bpm) || 120;
+  audioOffset = Number(s.audioOffset) || 0;
+  playbackRate = Number(s.playbackRate) || 1.0;
+  loopStart = (s.loopStart == null) ? null : Number(s.loopStart);
+  loopEnd = (s.loopEnd == null) ? null : Number(s.loopEnd);
+  memberIdSeq = Number(s.memberIdSeq) || 1;
+  frameIdSeq = Number(s.frameIdSeq) || 1;
+  stuntIdSeq = Number(s.stuntIdSeq) || 1;
+  members = JSON.parse(JSON.stringify(s.members));
+  frames = JSON.parse(JSON.stringify(s.frames));
+  currentFrameIdx = Math.max(0, Math.min(frames.length - 1, Number(s.currentFrameIdx) || 0));
+  // UI セグメント同期
+  document.querySelectorAll("#matSeg button").forEach(b => {
+    b.classList.toggle("on", b.dataset.mat === matMode);
+  });
+  document.querySelectorAll("#viewSeg button").forEach(b => {
+    b.classList.toggle("on", b.dataset.view === viewMode);
+  });
+  const bpmInput = document.getElementById("bpmInput");
+  if (bpmInput) bpmInput.value = bpm;
+  return true;
+}
+
+let _autoSaveTimer = null;
+let _autoSaveSuppressed = false; // 初期ロード中の誤書き込み防止
+function scheduleAutoSave() {
+  if (_autoSaveSuppressed) return;
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeFullState()));
+    } catch (e) {
+      console.warn("[Cheer Choreo] 自動保存に失敗:", e);
+    }
+  }, 500);
+}
+
+function loadFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn("[Cheer Choreo] localStorage 読み込み失敗:", e);
+    return null;
+  }
+}
+
+function clearStoredState() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* noop */ }
+}
+
+/* URL 状態エンコード（UTF-8 セーフな URL-safe base64） */
+function encodeStateForUrl(state) {
+  const json = JSON.stringify(state);
+  const bytes = new TextEncoder().encode(json);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeStateFromUrlHash(hash) {
+  try {
+    const m = hash.match(new RegExp("[#&]" + URL_HASH_KEY + "=([^&]+)"));
+    if (!m) return null;
+    let s = m[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    const bin = atob(s);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (e) {
+    console.warn("[Cheer Choreo] URL ハッシュ解読失敗:", e);
+    return null;
+  }
+}
+
+function buildShareUrl() {
+  const encoded = encodeStateForUrl(serializeFullState());
+  const base = window.location.href.split("#")[0];
+  return base + "#" + URL_HASH_KEY + "=" + encoded;
+}
+
+/* JSON 書き出し */
+function exportProjectAsJson() {
+  const state = serializeFullState();
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+  a.href = url;
+  a.download = `cheer-choreo-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+}
+
+/* JSON 読み込み */
+function importProjectFromFile(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const state = JSON.parse(reader.result);
+        if (applyFullState(state)) {
+          history = []; historyIdx = -1;
+          renderAll();
+          snapshot("JSON 読み込み");
+          resolve(true);
+        } else resolve(false);
+      } catch (e) {
+        console.warn("[Cheer Choreo] JSON 解析失敗:", e);
+        resolve(false);
+      }
+    };
+    reader.onerror = () => resolve(false);
+    reader.readAsText(file);
+  });
 }
 
 /* ======== DOM ======== */
@@ -2350,9 +2548,11 @@ document.getElementById("audioFile").addEventListener("change", e => {
 document.getElementById("bpmInput").addEventListener("change", e => {
   bpm = +e.target.value || 120;
   showHint("BPM = " + bpm + " （1カウント " + countDuration().toFixed(0) + "ms）");
+  scheduleAutoSave();
 });
 document.getElementById("offsetInput").addEventListener("change", e => {
   audioOffset = +e.target.value || 0;
+  scheduleAutoSave();
 });
 document.getElementById("loopWholeInput").addEventListener("change", e => {
   audioEl.loop = e.target.checked;
@@ -2715,6 +2915,7 @@ document.querySelectorAll("#matSeg button").forEach(btn => {
     btn.classList.add("on");
     matMode = btn.dataset.mat;
     fitFloor(); renderScene(); renderTokens();
+    scheduleAutoSave();
   });
 });
 
@@ -2726,6 +2927,7 @@ document.querySelectorAll("#viewSeg button").forEach(btn => {
     viewMode = btn.dataset.view;
     fitFloor(); renderScene(); renderTokens();
     showHint(viewMode === "top" ? "真上ビュー" : "正面ビュー（観客席から）");
+    scheduleAutoSave();
   });
 });
 
@@ -2872,25 +3074,95 @@ helpModal.addEventListener("click", e => {
   if (e.target === helpModal) helpModal.classList.remove("show");
 });
 
-/* Share to LINE / native share */
-document.getElementById("shareBtn").addEventListener("click", async () => {
-  const url = window.location.href;
-  const title = "Cheer Choreo - 振付アプリβ版";
-  const text = "チアの振付アプリを試してみませんか？スマホ／iPadで動きます🌟";
-  // Try native share first (mobile)
-  if (navigator.share) {
-    try {
-      await navigator.share({ title, text, url });
-      return;
-    } catch (e) { /* user cancelled */ }
+/* Share & Data modal */
+const shareModal = document.getElementById("shareModal");
+document.getElementById("shareBtn").addEventListener("click", () => {
+  shareModal.classList.add("show");
+});
+document.getElementById("shareClose").addEventListener("click", () => {
+  shareModal.classList.remove("show");
+});
+shareModal.addEventListener("click", e => {
+  if (e.target === shareModal) shareModal.classList.remove("show");
+});
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* fallback */ }
   }
-  // Fallback: LINE share URL (works on mobile and desktop)
+  // Fallback for non-secure contexts (file://, http on iOS Safari etc.)
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed"; ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { /* noop */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+document.getElementById("copyLinkBtn").addEventListener("click", async () => {
+  const url = buildShareUrl();
   if (url.startsWith("file://") || url.startsWith("about:")) {
-    showHint("先にURL化してください（Netlify Drop等）");
+    showHint("公開URL化してからお使いください（GitHub Pages 等）");
+    return;
+  }
+  const ok = await copyTextToClipboard(url);
+  if (ok) {
+    showHint("URL をコピーしました（" + url.length + " 文字）");
+    flashSavedIndicator("URL コピー");
+  } else {
+    // Last resort: show URL in a prompt for manual copy
+    window.prompt("URL を手動でコピーしてください：", url);
+  }
+});
+
+document.getElementById("lineShareBtn").addEventListener("click", async () => {
+  const url = buildShareUrl();
+  const title = "Cheer Choreo - 振付";
+  const text = "この振付を見てください🌟";
+  if (navigator.share) {
+    try { await navigator.share({ title, text, url }); return; } catch (e) { /* user cancelled */ }
+  }
+  if (url.startsWith("file://") || url.startsWith("about:")) {
+    showHint("公開URL化してからお使いください");
     return;
   }
   const lineUrl = "https://social-plugins.line.me/lineit/share?url=" + encodeURIComponent(url);
   window.open(lineUrl, "_blank", "noopener,width=600,height=600");
+});
+
+document.getElementById("exportJsonBtn").addEventListener("click", () => {
+  exportProjectAsJson();
+  showHint("JSON ファイルを書き出しました");
+});
+
+document.getElementById("importJsonBtn").addEventListener("click", () => {
+  document.getElementById("jsonFileInput").click();
+});
+
+document.getElementById("jsonFileInput").addEventListener("change", async e => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ""; // reset so same file can be re-selected later
+  if (!file) return;
+  if (!confirm("現在編集中の振付は上書きされます。続行しますか？")) return;
+  const ok = await importProjectFromFile(file);
+  if (ok) {
+    shareModal.classList.remove("show");
+    showHint("JSON から振付を読み込みました");
+  } else {
+    alert("読み込みに失敗しました。ファイルが Cheer Choreo の JSON か確認してください。");
+  }
+});
+
+document.getElementById("clearStoredBtn").addEventListener("click", () => {
+  if (!confirm("この端末に保存された振付データをすべて消去してサンプル振付に戻します。よろしいですか？")) return;
+  clearStoredState();
+  shareModal.classList.remove("show");
+  // Reload without hash to ensure fresh default state
+  const base = window.location.href.split("#")[0];
+  window.location.href = base;
 });
 
 window.addEventListener("resize", () => { fitFloor(); renderScene(); renderTokens(); });
@@ -3132,12 +3404,47 @@ function renderAll() {
   renderStunts(); renderScore(); renderTimeline(); renderCountBar();
   updateScrubUI(); renderMemberControl();
 }
-requestAnimationFrame(() => {
+function initApp() {
+  _autoSaveSuppressed = true;
+  let loadedFrom = null;
+  // 1. URL ハッシュに状態が埋まっていれば最優先で復元
+  if (window.location.hash) {
+    const urlState = decodeStateFromUrlHash(window.location.hash);
+    if (urlState && applyFullState(urlState)) {
+      loadedFrom = "url";
+      // URL ハッシュを消してアドレスバーを綺麗に（保存先は localStorage に切り替わる）
+      try { window.history.replaceState(null, "", window.location.pathname + window.location.search); } catch (e) { /* noop */ }
+    }
+  }
+  // 2. URL になければ localStorage を確認
+  if (!loadedFrom) {
+    const stored = loadFromLocalStorage();
+    if (stored && applyFullState(stored)) loadedFrom = "local";
+  }
+  // 3. どちらもなければ既定のサンプル状態（既に globals に入っている）
   renderAll();
+  _autoSaveSuppressed = false;
   // Initial snapshot for undo baseline
   snapshot("初期状態");
-  setTimeout(() => showHint("メンバーをドラッグで配置 ／ ダブルタップで高さ変更"), 400);
-});
+  setTimeout(() => {
+    if (loadedFrom === "url") {
+      showHint("URL から振付を復元しました");
+    } else if (loadedFrom === "local") {
+      showHint("前回の続きから再開しました（自動保存）");
+    } else {
+      showHint("メンバーをドラッグで配置 ／ ダブルタップで高さ変更");
+    }
+  }, 400);
+}
+// rAF を試し、フォールバックで setTimeout も用意（プレビュー環境等で rAF が走らないケースに備える）
+let _appInitialized = false;
+function _safeInit() {
+  if (_appInitialized) return;
+  _appInitialized = true;
+  initApp();
+}
+requestAnimationFrame(_safeInit);
+setTimeout(_safeInit, 50);
 </script>
 </body>
 </html>
