@@ -76,8 +76,9 @@
   }
   @media (max-width: 820px) {
     main { grid-template-columns: 64px 1fr; }
-    .right-panel { display: none; }
-    .right-panel.show-mobile { display: flex; position: fixed; top: 50px; right: 4px; bottom: 80px; width: 250px; z-index: 50; box-shadow: -4px 0 20px rgba(0,0,0,0.5); }
+    /* !important で後段の .right-panel { display: flex } を上書き（モバイルでは既定で非表示） */
+    .right-panel { display: none !important; }
+    .right-panel.show-mobile { display: flex !important; position: fixed; top: 50px; right: 4px; bottom: 80px; width: 250px; z-index: 50; box-shadow: -4px 0 20px rgba(0,0,0,0.5); }
   }
 
   /* Count Bar (LEFT) */
@@ -497,7 +498,17 @@
     background: var(--panel); border-radius: 12px;
     display: flex; flex-direction: column; min-height: 0;
     overflow: hidden;
+    position: relative;
   }
+  .panel-close {
+    position: absolute; top: 6px; right: 8px;
+    background: transparent; border: none;
+    color: var(--muted); font-size: 22px; font-weight: 700;
+    cursor: pointer; padding: 2px 8px;
+    z-index: 5;
+    line-height: 1;
+  }
+  .panel-close:hover, .panel-close:active { color: var(--text); }
   .panel-tabs { display: flex; border-bottom: 1px solid #2a3155; }
   .panel-tabs button {
     flex: 1; background: transparent; border: none; color: var(--muted);
@@ -887,7 +898,7 @@
       <button class="btn primary" id="playBtn">▶ 再生</button>
       <button class="btn" id="shareBtn" title="LINEで共有">📤 共有</button>
       <button class="btn" id="helpBtn" title="使い方ガイド">❓ ヘルプ</button>
-      <button class="btn mobile-toggle" id="togglePanel">⚙</button>
+      <button class="btn mobile-toggle" id="togglePanel" title="メンバー／スタンツ／採点 パネルを開閉">👥</button>
     </div>
   </header>
 
@@ -913,6 +924,7 @@
 
     <!-- RIGHT: roster + stunts + scoring -->
     <aside class="right-panel" id="rightPanel">
+      <button class="panel-close mobile-only" id="panelClose" aria-label="閉じる" title="閉じる">×</button>
       <div class="panel-tabs">
         <button data-tab="members" class="on">メンバー</button>
         <button data-tab="stunts">スタンツ</button>
@@ -3059,6 +3071,9 @@ document.querySelectorAll(".panel-tabs button").forEach(btn => {
 
 document.getElementById("togglePanel").addEventListener("click", () => {
   document.getElementById("rightPanel").classList.toggle("show-mobile");
+});
+document.getElementById("panelClose").addEventListener("click", () => {
+  document.getElementById("rightPanel").classList.remove("show-mobile");
 });
 
 document.getElementById("musicMore").addEventListener("click", () => {
