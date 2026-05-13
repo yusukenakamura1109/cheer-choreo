@@ -147,15 +147,19 @@
   }
   .scrub-banner {
     position: absolute;
-    top: 8px; left: 50%; transform: translateX(-50%);
+    bottom: 10px; left: 8px; right: 8px;
     background: var(--accent-3); color: #4a3500;
-    font-size: 12px; font-weight: 800;
-    padding: 6px 14px; border-radius: 14px;
-    z-index: 25;
+    font-size: 13px; font-weight: 800;
+    padding: 8px 14px; border-radius: 14px;
+    z-index: 30;
     pointer-events: none;
-    white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    text-align: center;
+    line-height: 1.35;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
     display: none;
+  }
+  @media (min-width: 600px) {
+    .scrub-banner { left: 50%; right: auto; transform: translateX(-50%); white-space: nowrap; }
   }
   .floor.scrub-active .scrub-banner { display: block; }
   .scrub-controls .undo-btn, .scrub-controls .redo-btn {
@@ -902,7 +906,7 @@
       <div class="member-control" id="memberControl"></div>
       <div class="floor-outer">
         <div class="floor" id="floor">
-          <div class="scrub-banner">🎯 確認モード — 編集するには「✕ 終了」</div>
+          <div class="scrub-banner" id="scrubBanner">📍 メンバーをタップ／ドラッグするとこのカウントで隊形を分割して編集できます</div>
         </div>
       </div>
     </div>
@@ -1594,11 +1598,11 @@ const matModeLabel = document.getElementById("matModeLabel");
 const totalPtsEl = document.getElementById("totalPts");
 const hintEl = document.getElementById("hint");
 
-function showHint(msg) {
+function showHint(msg, durationMs) {
   hintEl.textContent = msg;
   hintEl.classList.add("show");
   clearTimeout(showHint._t);
-  showHint._t = setTimeout(() => hintEl.classList.remove("show"), 1800);
+  showHint._t = setTimeout(() => hintEl.classList.remove("show"), durationMs || 1800);
 }
 
 /* ======== Scrub helpers ======== */
@@ -2560,17 +2564,21 @@ function updateScrubUI() {
   const info = document.getElementById("scrubInfo");
   const exitBtn = document.getElementById("exitScrubBtn");
   const splitBtn = document.getElementById("splitBtn");
+  const banner = document.getElementById("scrubBanner");
   if (scrubMode) {
     const { frameIdx, localCount } = findFrameAtGlobalCount(scrubGlobalCount);
     const f = frames[frameIdx];
-    info.textContent = `🎯 確認 ${localCount}/${f.counts} (${f.name})`;
+    info.textContent = `🎯 編集中 ${localCount}/${f.counts} (${f.name})`;
     info.classList.remove("idle");
     exitBtn.style.display = "";
     splitBtn.style.display = "";
     floor.classList.add("scrub-active");
+    if (banner) {
+      banner.textContent = `📍 タップ／ドラッグでカウント ${localCount} の隊形を編集`;
+    }
     updateScrubHighlight();
   } else {
-    info.textContent = "◀▶で1カウントずつ確認モードに入る";
+    info.textContent = "◀▶で1カウントずつ動きを決められます";
     info.classList.add("idle");
     exitBtn.style.display = "none";
     splitBtn.style.display = "none";
@@ -2956,10 +2964,15 @@ document.getElementById("resetBtn").addEventListener("click", () => {
 });
 
 /* Scrub controls */
+let _scrubHintShown = false;
 function enterScrubAtCurrentFrame() {
   if (!scrubMode) {
     scrubMode = true;
     scrubGlobalCount = globalCountForFrame(currentFrameIdx, frames[currentFrameIdx].counts);
+    if (!_scrubHintShown) {
+      _scrubHintShown = true;
+      showHint("🎯 1カウント編集モード：◀▶でカウント移動 → メンバーをタップ／ドラッグでそのカウントの隊形を作成", 5000);
+    }
   }
 }
 document.getElementById("undoBtn").addEventListener("click", undoAction);
