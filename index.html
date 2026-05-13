@@ -31,7 +31,9 @@
     background: var(--bg); color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
     overflow: hidden; touch-action: manipulation;
+    overscroll-behavior: none; /* iOS のラバーバンドを抑制 */
   }
+  body { position: fixed; inset: 0; width: 100%; }
   .app {
     display: grid;
     grid-template-rows: auto 1fr auto;
@@ -2129,6 +2131,7 @@ function createFigure(m, pos, stunt, floorRect) {
 function enableDragFront(fig) {
   let dragging = false, pointerId = null, moved = false;
   let startX = 0, startY = 0;
+  let cachedRect = null;
   fig.addEventListener("pointerdown", e => {
     if (isPlaying) return;
     if (scrubMode) {
@@ -2143,15 +2146,17 @@ function enableDragFront(fig) {
     dragging = true; moved = false;
     pointerId = e.pointerId;
     startX = e.clientX; startY = e.clientY;
+    cachedRect = floor.getBoundingClientRect();
     fig.setPointerCapture(pointerId);
     fig.classList.add("dragging");
     e.preventDefault();
   });
   fig.addEventListener("pointermove", e => {
     if (!dragging) return;
+    e.preventDefault();
     const dx = e.clientX - startX, dy = e.clientY - startY;
     if (Math.hypot(dx, dy) > 4) moved = true;
-    const r = floor.getBoundingClientRect();
+    const r = cachedRect;
     let x = (e.clientX - r.left) / r.width;
     const horizon = 0.45, stagePart = 0.55;
     const myFoot = (e.clientY - r.top) / r.height;
@@ -2171,6 +2176,7 @@ function enableDragFront(fig) {
   const end = () => {
     if (!dragging) return;
     dragging = false;
+    cachedRect = null;
     fig.classList.remove("dragging");
     if (pointerId !== null) { try { fig.releasePointerCapture(pointerId); } catch(_){} }
     if (!moved) onFigureTap(fig);
@@ -2258,6 +2264,7 @@ function enableDrag(tok) {
   let downTime = 0;
   let moved = false;
   let startX = 0, startY = 0;
+  let cachedRect = null; // ドラッグ開始時のフロア座標（途中のレイアウト変動を無視）
   tok.addEventListener("pointerdown", e => {
     if (isPlaying) return;
     if (scrubMode) {
@@ -2273,15 +2280,17 @@ function enableDrag(tok) {
     pointerId = e.pointerId;
     downTime = Date.now();
     startX = e.clientX; startY = e.clientY;
+    cachedRect = floor.getBoundingClientRect();
     tok.setPointerCapture(pointerId);
     tok.classList.add("dragging");
     e.preventDefault();
   });
   tok.addEventListener("pointermove", e => {
     if (!dragging) return;
+    e.preventDefault(); // モバイルでのスクロール抑制
     const dx = e.clientX - startX, dy = e.clientY - startY;
     if (Math.hypot(dx, dy) > 4) moved = true;
-    const r = floor.getBoundingClientRect();
+    const r = cachedRect; // キャッシュした座標を使用（途中のレイアウト変動の影響を受けない）
     let x = (e.clientX - r.left) / r.width;
     let y = (e.clientY - r.top) / r.height;
     x = Math.max(0.03, Math.min(0.97, x));
@@ -2299,6 +2308,7 @@ function enableDrag(tok) {
   const end = () => {
     if (!dragging) return;
     dragging = false;
+    cachedRect = null;
     tok.classList.remove("dragging");
     if (pointerId !== null) { try { tok.releasePointerCapture(pointerId); } catch(_){} }
     if (!moved) onTokenTap(tok);
@@ -3297,6 +3307,10 @@ document.getElementById("clearStoredBtn").addEventListener("click", () => {
 });
 
 window.addEventListener("resize", () => { fitFloor(); renderScene(); renderTokens(); });
+// iOS Safari のアドレスバー出現/退避は通常の resize を発火しないことがあるので visualViewport も監視
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () => { fitFloor(); renderScene(); renderTokens(); });
+}
 
 /* ======== Member Control Card ======== */
 const memberControl = document.getElementById("memberControl");
