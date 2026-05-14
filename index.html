@@ -731,6 +731,33 @@
     text-align: center;
     margin: 4px 0;
   }
+  /* Field selector modal */
+  .field-list {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px; margin-top: 4px;
+  }
+  .field-card {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; padding: 10px 6px;
+    background: var(--panel-2); color: var(--text);
+    border: 2px solid #34406d; border-radius: 10px;
+    cursor: pointer; transition: all 0.15s;
+    font-family: inherit;
+  }
+  .field-card:hover { border-color: var(--accent-2); }
+  .field-card.on { border-color: var(--accent); background: rgba(255, 95, 162, 0.15); }
+  .field-card-icon { font-size: 24px; line-height: 1; }
+  .field-card-label { font-size: 12px; font-weight: 700; }
+  .field-card-size { font-size: 10px; color: var(--muted); }
+  .field-size-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .field-size-row label { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; color: var(--text); }
+  .field-size-row input {
+    width: 80px; padding: 4px 6px; font-size: 13px;
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid #34406d; border-radius: 6px;
+    font-family: inherit;
+  }
+  .field-size-row input:disabled { opacity: 0.5; cursor: not-allowed; }
   /* Snap toggle button */
   .btn.snap-toggle {
     transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
@@ -889,10 +916,7 @@
   <header>
     <div class="title"><span class="pom">★</span> Cheer Choreo <span style="color:var(--muted);font-size:11px;font-weight:400;">v2</span></div>
     <div class="controls">
-      <div class="seg" id="matSeg">
-        <button data-mat="usa" class="on">USA (9)</button>
-        <button data-mat="jca">JCA (7)</button>
-      </div>
+      <button class="btn" id="fieldBtn" title="フィールド種類・サイズを選択">🏟 USA (9)</button>
       <div class="seg" id="viewSeg">
         <button data-view="top" class="on">真上</button>
         <button data-view="front">正面</button>
@@ -1150,6 +1174,23 @@
   </div>
 </div>
 
+<!-- Field selector modal -->
+<div class="help-modal" id="fieldModal">
+  <div class="help-content">
+    <button class="help-close" id="fieldClose" aria-label="閉じる">×</button>
+    <h2>🏟 フィールドを選択</h2>
+    <p class="help-tip" style="margin-bottom:10px">演技する場所の種類とサイズを選びます。サイズはメートル単位で変更できます（チア用マットは規格固定）。</p>
+    <div class="field-list" id="fieldList"></div>
+    <h3 style="margin-top:14px">サイズ調整</h3>
+    <div class="field-size-row">
+      <label>幅(m)：<input type="number" id="fieldWidthInput" min="3" max="200" step="0.1" /></label>
+      <label>奥行き(m)：<input type="number" id="fieldDepthInput" min="3" max="200" step="0.1" /></label>
+    </div>
+    <p class="help-tip" id="fieldSizeNote" style="margin-top:6px">サイズはメートル単位で変更できます（0.1m 刻み）</p>
+    <button class="btn primary share-action" id="fieldApplyBtn" style="margin-top:14px">✓ このフィールドで適用</button>
+  </div>
+</div>
+
 <script>
 /* ======== Constants ======== */
 const MAT_CONFIGS = {
@@ -1158,6 +1199,26 @@ const MAT_CONFIGS = {
 };
 const MAT_W_CM = 183;
 const MAT_H_CM = 1260;
+
+/* ======== Field types (cheer mat / basketball / stage / custom) ======== */
+const FIELD_TYPES = {
+  "usa-mat":   { label: "USA 9マット",  icon: "🏐", category: "cheer", widthM: 9 * 1.83, depthM: 12.6, sizeEditable: false, matMode: "usa" },
+  "jca-mat":   { label: "JCA 7マット",  icon: "🏐", category: "cheer", widthM: 7 * 1.83, depthM: 12.6, sizeEditable: false, matMode: "jca" },
+  "basketball":{ label: "バスケットコート", icon: "🏀", category: "basketball", widthM: 28, depthM: 15, sizeEditable: true },
+  "stage":     { label: "ステージ",     icon: "🎭", category: "stage", widthM: 12, depthM: 8, sizeEditable: true },
+  "custom":    { label: "カスタム",     icon: "🏟", category: "custom", widthM: 15, depthM: 10, sizeEditable: true },
+};
+
+function getFieldDef() {
+  return FIELD_TYPES[fieldType] || FIELD_TYPES["usa-mat"];
+}
+function getFieldDims() {
+  const t = getFieldDef();
+  return {
+    widthM: (customWidthM != null && t.sizeEditable) ? customWidthM : t.widthM,
+    depthM: (customDepthM != null && t.sizeEditable) ? customDepthM : t.depthM,
+  };
+}
 
 const ROLES = {
   base:     { label: "ベース",       color: "var(--base)",     short: "BASE" },
@@ -1245,6 +1306,9 @@ let frameIdSeq = 1;
 let stuntIdSeq = 1;
 
 let matMode = "usa";
+let fieldType = "usa-mat"; // FIELD_TYPES のキー。matMode は cheer 系のみで使用
+let customWidthM = null;   // null = フィールドの既定値を使用（カスタムサイズ時のみ数値）
+let customDepthM = null;
 let viewMode = "top"; // "top" or "front"
 
 let members = [
@@ -1382,11 +1446,17 @@ let snapEnabled = true;
 const SNAP_THRESHOLD = 0.012; // normalized x の閾値（マット幅の約11%まで吸い込む≒指の誤差を許容）
 
 function getSnapXs(mode) {
-  const n = MAT_CONFIGS[mode].count;
-  const pts = [];
-  for (let i = 0; i <= n; i++) pts.push(i / n);           // マット境界線
-  for (let i = 0; i < n; i++)  pts.push((i + 0.5) / n);   // 各マットの中央
-  return pts;
+  // cheer 系：マット境界線＋各マット中央。非 cheer：4 等分線＋中央＋両端。
+  const def = getFieldDef();
+  if (def.category === "cheer") {
+    const n = MAT_CONFIGS[def.matMode].count;
+    const pts = [];
+    for (let i = 0; i <= n; i++) pts.push(i / n);
+    for (let i = 0; i < n; i++)  pts.push((i + 0.5) / n);
+    return pts;
+  }
+  // 非 cheer：左端・1/4・中央・3/4・右端
+  return [0, 0.25, 0.5, 0.75, 1];
 }
 
 function snapXValue(x, mode) {
@@ -1458,6 +1528,7 @@ function serializeFullState() {
   return {
     v: STATE_SCHEMA_VERSION,
     matMode, viewMode, snapEnabled,
+    fieldType, customWidthM, customDepthM,
     bpm, audioOffset, playbackRate, loopStart, loopEnd,
     memberIdSeq, frameIdSeq, stuntIdSeq,
     members: JSON.parse(JSON.stringify(members)),
@@ -1477,6 +1548,11 @@ function applyFullState(s) {
   matMode = (s.matMode === "jca") ? "jca" : "usa";
   viewMode = (s.viewMode === "front") ? "front" : "top";
   snapEnabled = (s.snapEnabled !== false); // 未指定なら ON
+  // fieldType の復元（後方互換：未指定なら matMode から推定）
+  if (s.fieldType && FIELD_TYPES[s.fieldType]) fieldType = s.fieldType;
+  else fieldType = (matMode === "jca") ? "jca-mat" : "usa-mat";
+  customWidthM = (typeof s.customWidthM === "number") ? s.customWidthM : null;
+  customDepthM = (typeof s.customDepthM === "number") ? s.customDepthM : null;
   bpm = Number(s.bpm) || 120;
   audioOffset = Number(s.audioOffset) || 0;
   playbackRate = Number(s.playbackRate) || 1.0;
@@ -1489,12 +1565,10 @@ function applyFullState(s) {
   frames = JSON.parse(JSON.stringify(s.frames));
   currentFrameIdx = Math.max(0, Math.min(frames.length - 1, Number(s.currentFrameIdx) || 0));
   // UI セグメント同期
-  document.querySelectorAll("#matSeg button").forEach(b => {
-    b.classList.toggle("on", b.dataset.mat === matMode);
-  });
   document.querySelectorAll("#viewSeg button").forEach(b => {
     b.classList.toggle("on", b.dataset.view === viewMode);
   });
+  updateFieldBtnLabel();
   const bpmInput = document.getElementById("bpmInput");
   if (bpmInput) bpmInput.value = bpm;
   const snapBtn = document.getElementById("snapBtn");
@@ -1672,11 +1746,12 @@ function getActiveStunts() {
 /* ======== Floor sizing (preserve aspect ratio) ======== */
 let figureHeight = 76; // dynamically computed in fitFloor for front view
 function fitFloor() {
-  const cfg = MAT_CONFIGS[matMode];
+  const def = getFieldDef();
+  const dims = getFieldDims();
   // Top view = realistic mat aspect; Front view taller to fit extension stunts
   const aspect = viewMode === "top"
-    ? (cfg.count * MAT_W_CM) / MAT_H_CM
-    : (cfg.count * MAT_W_CM) / (MAT_H_CM * 1.05);
+    ? dims.widthM / dims.depthM
+    : dims.widthM / (dims.depthM * 1.05);
   const wrap = floor.parentElement;
   const W = wrap.clientWidth;
   const H = wrap.clientHeight;
@@ -1688,32 +1763,70 @@ function fitFloor() {
   }
   floor.style.width = w + "px";
   floor.style.height = h + "px";
-  // Dynamically size tokens (top view circles) — マット1本の幅に対する比率で決める。
-  // モバイル（細いフロア）では従来より小さく、デスクトップでは見やすい上限まで。
-  // 最低 22px は名前文字が辛うじて読める下限。
-  const stripWidth = w / cfg.count;
-  const tokenSize = Math.max(22, Math.min(48, stripWidth * 0.62));
+  // Token sizing — cheer 系はマット幅ベース、それ以外はフィールド幅を 6 等分した値ベース
+  const sizeBase = def.category === "cheer"
+    ? w / MAT_CONFIGS[def.matMode].count
+    : w / 8;
+  const tokenSize = Math.max(22, Math.min(48, sizeBase * 0.62));
   floor.style.setProperty("--token-size", tokenSize + "px");
-  // Dynamically size figures (front view human silhouettes)
-  figureHeight = Math.max(38, Math.min(76, stripWidth * 1.1));
+  figureHeight = Math.max(38, Math.min(76, sizeBase * 1.1));
 }
 
 /* ======== Scene rendering (top vs front) ======== */
 function renderScene() {
   if (viewMode === "top") {
     floor.classList.remove("front-view");
-    renderMat();
+    renderField();
   } else {
     floor.classList.add("front-view");
-    renderMatFront();
+    renderFieldFront();
   }
 }
 
-function renderMatFront() {
-  // Clear all dynamic elements
-  floor.querySelectorAll(".mat-strip,.center-h-line,.center-cross,.mat-num,.audience-label,.judges-label,.horizon-line,.center-cross-fv,.front-mat-svg,.fv-mat-num,.fv-cc-label").forEach(e => e.remove());
+/* Field background dispatcher ─ category 別に描画関数を呼び分ける */
+function renderField() {
+  // Clear ALL static elements — keep tokens
+  floor.querySelectorAll(".mat-strip,.center-h-line,.center-cross,.mat-num,.audience-label,.judges-label,.horizon-line,.center-cross-fv,.front-mat-svg,.fv-mat-num,.fv-cc-label,.field-bg-svg,.field-label").forEach(e => e.remove());
+  const def = getFieldDef();
+  const dims = getFieldDims();
+  // Set background color per category
+  if (def.category === "stage") floor.style.background = "#1f2540";
+  else if (def.category === "basketball") floor.style.background = "#c79061";
+  else if (def.category === "custom") floor.style.background = "#243049";
+  else floor.style.background = ""; // cheer ─ CSS default (cream)
 
-  const cfg = MAT_CONFIGS[matMode];
+  if (def.category === "cheer") {
+    renderCheerMatTop(def);
+  } else if (def.category === "basketball") {
+    renderBasketballTop(dims);
+  } else if (def.category === "stage") {
+    renderStageTop(dims);
+  } else {
+    renderCustomTop(dims);
+  }
+  matModeLabel.textContent = `${def.icon} ${def.label} （${dims.widthM.toFixed(2)}m × ${dims.depthM.toFixed(2)}m）`;
+}
+
+function renderFieldFront() {
+  floor.querySelectorAll(".mat-strip,.center-h-line,.center-cross,.mat-num,.audience-label,.judges-label,.horizon-line,.center-cross-fv,.front-mat-svg,.fv-mat-num,.fv-cc-label,.field-bg-svg,.field-label").forEach(e => e.remove());
+  const def = getFieldDef();
+  const dims = getFieldDims();
+  if (def.category === "stage") floor.style.background = "#1f2540";
+  else if (def.category === "basketball") floor.style.background = "#c79061";
+  else if (def.category === "custom") floor.style.background = "#243049";
+  else floor.style.background = "";
+
+  if (def.category === "cheer") {
+    renderCheerMatFront(def);
+  } else {
+    // 非 cheer のフィールドは正面ビューでも簡易な遠近表現
+    renderGenericFront(def, dims);
+  }
+  matModeLabel.textContent = `${def.icon} ${def.label} ／ 正面ビュー ／ ${dims.widthM.toFixed(2)}m × ${dims.depthM.toFixed(2)}m`;
+}
+
+function renderCheerMatFront(def) {
+  const cfg = MAT_CONFIGS[def.matMode];
   const N = cfg.count;
   const cIdx = cfg.centerIdx;
 
@@ -1820,13 +1933,10 @@ function renderMatFront() {
   ccLabel.style.cssText = `position:absolute;top:74%;left:50%;transform:translate(-50%, -100%);font-size:9px;font-weight:800;color:#c9332e;background:rgba(255,255,255,0.9);padding:1px 5px;border-radius:4px;pointer-events:none;z-index:2;letter-spacing:0.5px;`;
   floor.appendChild(ccLabel);
 
-  matModeLabel.textContent = cfg.label + " ／ 正面ビュー（観客席から） ／ 中央マット ＝ " + (cIdx + 1) + " 本目";
 }
 
-function renderMat() {
-  // Clear ALL static elements (both top-view and front-view leftovers) — keep tokens
-  floor.querySelectorAll(".mat-strip,.center-h-line,.center-cross,.mat-num,.audience-label,.judges-label,.horizon-line,.center-cross-fv,.front-mat-svg,.fv-mat-num,.fv-cc-label").forEach(e => e.remove());
-  const cfg = MAT_CONFIGS[matMode];
+function renderCheerMatTop(def) {
+  const cfg = MAT_CONFIGS[def.matMode];
   const stripPct = 100 / cfg.count;
   for (let i = 0; i < cfg.count; i++) {
     const s = document.createElement("div");
@@ -1859,8 +1969,182 @@ function renderMat() {
   jud.className = "judges-label";
   jud.textContent = "← JUDGES";
   floor.appendChild(jud);
+}
 
-  matModeLabel.textContent = cfg.label + " （実寸 " + (cfg.count * MAT_W_CM / 100).toFixed(2) + "m × " + (MAT_H_CM/100) + "m）";
+/* ─── Basketball court (top view) ─── */
+function renderBasketballTop(dims) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "field-bg-svg");
+  svg.setAttribute("viewBox", "0 0 1000 1000");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;";
+  // sidelines
+  const outer = document.createElementNS(svgNS, "rect");
+  outer.setAttribute("x", "8"); outer.setAttribute("y", "8");
+  outer.setAttribute("width", "984"); outer.setAttribute("height", "984");
+  outer.setAttribute("fill", "none"); outer.setAttribute("stroke", "#fff");
+  outer.setAttribute("stroke-width", "6"); outer.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(outer);
+  // center line (horizontal — court is wider than deep)
+  const cl = document.createElementNS(svgNS, "line");
+  cl.setAttribute("x1", "500"); cl.setAttribute("y1", "8");
+  cl.setAttribute("x2", "500"); cl.setAttribute("y2", "992");
+  cl.setAttribute("stroke", "#fff"); cl.setAttribute("stroke-width", "4");
+  cl.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(cl);
+  // center circle (approx ellipse to keep visual)
+  const cc = document.createElementNS(svgNS, "ellipse");
+  cc.setAttribute("cx", "500"); cc.setAttribute("cy", "500");
+  cc.setAttribute("rx", "70"); cc.setAttribute("ry", "115");
+  cc.setAttribute("fill", "none"); cc.setAttribute("stroke", "#fff");
+  cc.setAttribute("stroke-width", "4"); cc.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(cc);
+  // 3-point arcs (簡略化：左右端の半円)
+  ["left", "right"].forEach(side => {
+    const arc = document.createElementNS(svgNS, "path");
+    const cx = side === "left" ? 8 : 992;
+    const sweep = side === "left" ? 1 : 0;
+    arc.setAttribute("d", `M ${cx} 300 A 280 200 0 0 ${sweep} ${cx} 700`);
+    arc.setAttribute("fill", "none"); arc.setAttribute("stroke", "#fff");
+    arc.setAttribute("stroke-width", "3.5"); arc.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(arc);
+  });
+  // free-throw boxes (左右)
+  ["left", "right"].forEach(side => {
+    const rect = document.createElementNS(svgNS, "rect");
+    const x = side === "left" ? 8 : 838;
+    rect.setAttribute("x", x); rect.setAttribute("y", "380");
+    rect.setAttribute("width", "154"); rect.setAttribute("height", "240");
+    rect.setAttribute("fill", "none"); rect.setAttribute("stroke", "#fff");
+    rect.setAttribute("stroke-width", "3"); rect.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(rect);
+  });
+  floor.appendChild(svg);
+  // center cross marker
+  addCenterCrossMarker();
+}
+
+/* ─── Stage (top view) ─── */
+function renderStageTop(dims) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "field-bg-svg");
+  svg.setAttribute("viewBox", "0 0 1000 1000");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;";
+  // perimeter
+  const outer = document.createElementNS(svgNS, "rect");
+  outer.setAttribute("x", "12"); outer.setAttribute("y", "12");
+  outer.setAttribute("width", "976"); outer.setAttribute("height", "976");
+  outer.setAttribute("fill", "none"); outer.setAttribute("stroke", "#ffd166");
+  outer.setAttribute("stroke-width", "5"); outer.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(outer);
+  // center cross
+  const v = document.createElementNS(svgNS, "line");
+  v.setAttribute("x1", "500"); v.setAttribute("y1", "12");
+  v.setAttribute("x2", "500"); v.setAttribute("y2", "988");
+  v.setAttribute("stroke", "#ffd166"); v.setAttribute("stroke-width", "1.5");
+  v.setAttribute("stroke-dasharray", "8 6"); v.setAttribute("opacity", "0.5");
+  v.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(v);
+  const h = document.createElementNS(svgNS, "line");
+  h.setAttribute("x1", "12"); h.setAttribute("y1", "500");
+  h.setAttribute("x2", "988"); h.setAttribute("y2", "500");
+  h.setAttribute("stroke", "#ffd166"); h.setAttribute("stroke-width", "1.5");
+  h.setAttribute("stroke-dasharray", "8 6"); h.setAttribute("opacity", "0.5");
+  h.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(h);
+  floor.appendChild(svg);
+  // labels
+  const aud = document.createElement("div");
+  aud.className = "audience-label";
+  aud.textContent = "A U D I E N C E";
+  aud.style.color = "#ffd166";
+  floor.appendChild(aud);
+  addCenterCrossMarker("#ffd166");
+}
+
+/* ─── Custom field (top view) — minimal blank rectangle ─── */
+function renderCustomTop(dims) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "field-bg-svg");
+  svg.setAttribute("viewBox", "0 0 1000 1000");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;";
+  // 4分割の薄いガイド線
+  [0.25, 0.5, 0.75].forEach(p => {
+    const v = document.createElementNS(svgNS, "line");
+    v.setAttribute("x1", p * 1000); v.setAttribute("y1", 0);
+    v.setAttribute("x2", p * 1000); v.setAttribute("y2", 1000);
+    v.setAttribute("stroke", "#6ed3ff");
+    v.setAttribute("stroke-width", p === 0.5 ? "2" : "1");
+    v.setAttribute("stroke-dasharray", "6 8");
+    v.setAttribute("opacity", p === 0.5 ? "0.5" : "0.25");
+    v.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(v);
+    const hl = document.createElementNS(svgNS, "line");
+    hl.setAttribute("x1", 0); hl.setAttribute("y1", p * 1000);
+    hl.setAttribute("x2", 1000); hl.setAttribute("y2", p * 1000);
+    hl.setAttribute("stroke", "#6ed3ff");
+    hl.setAttribute("stroke-width", p === 0.5 ? "2" : "1");
+    hl.setAttribute("stroke-dasharray", "6 8");
+    hl.setAttribute("opacity", p === 0.5 ? "0.5" : "0.25");
+    hl.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(hl);
+  });
+  floor.appendChild(svg);
+  addCenterCrossMarker("#6ed3ff");
+}
+
+/* 中央×中央のクロスマーカー（HTML、cheer 系の center-cross を流用しないで簡易版） */
+function addCenterCrossMarker(color) {
+  const cc = document.createElement("div");
+  cc.className = "center-cross";
+  cc.innerHTML = `<div class="ring"></div><div class="label">CENTER × CENTER</div>`;
+  if (color) cc.style.setProperty("--center-color", color);
+  floor.appendChild(cc);
+}
+
+/* ─── Generic front view for non-cheer fields（簡易遠近） ─── */
+function renderGenericFront(def, dims) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "front-mat-svg");
+  svg.setAttribute("viewBox", "0 0 1000 1000");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;";
+  const horizonY = 500, bottomY = 1000;
+  const vpL = 320, vpR = 680;
+  // stage trapezoid
+  const stage = document.createElementNS(svgNS, "polygon");
+  stage.setAttribute("points", `${vpL},${horizonY} ${vpR},${horizonY} 1000,${bottomY} 0,${bottomY}`);
+  const bgColor = def.category === "stage" ? "rgba(31,37,64,0.85)"
+    : def.category === "basketball" ? "rgba(199,144,97,0.85)"
+    : "rgba(36,48,73,0.85)";
+  stage.setAttribute("fill", bgColor);
+  svg.appendChild(stage);
+  // perimeter
+  const accentColor = def.category === "basketball" ? "#fff" : "#ffd166";
+  ["left", "right"].forEach(side => {
+    const ln = document.createElementNS(svgNS, "line");
+    const tX = side === "left" ? vpL : vpR;
+    const bX = side === "left" ? 0 : 1000;
+    ln.setAttribute("x1", tX); ln.setAttribute("y1", horizonY);
+    ln.setAttribute("x2", bX); ln.setAttribute("y2", bottomY);
+    ln.setAttribute("stroke", accentColor); ln.setAttribute("stroke-width", "2.5");
+    ln.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(ln);
+  });
+  // horizon
+  const hl = document.createElementNS(svgNS, "line");
+  hl.setAttribute("x1", vpL); hl.setAttribute("y1", horizonY);
+  hl.setAttribute("x2", vpR); hl.setAttribute("y2", horizonY);
+  hl.setAttribute("stroke", accentColor); hl.setAttribute("stroke-width", "2");
+  hl.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(hl);
+  floor.appendChild(svg);
 }
 
 /* ======== Roster ======== */
@@ -3042,15 +3326,91 @@ document.getElementById("splitBtn").addEventListener("click", () => {
   showHint(`隊形を ${lc} カウントで分割しました`);
 });
 
-// Mat selector
-document.querySelectorAll("#matSeg button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll("#matSeg button").forEach(b => b.classList.remove("on"));
-    btn.classList.add("on");
-    matMode = btn.dataset.mat;
-    fitFloor(); renderScene(); renderTokens();
-    scheduleAutoSave();
+// Field selector — modal で種類とサイズを選択
+function applyFieldChange(newType, newCustomW, newCustomD) {
+  fieldType = newType;
+  const def = getFieldDef();
+  if (def.matMode) matMode = def.matMode; // cheer 系では従来コードのために matMode も同期
+  customWidthM = (newCustomW != null) ? newCustomW : null;
+  customDepthM = (newCustomD != null) ? newCustomD : null;
+  updateFieldBtnLabel();
+  fitFloor(); renderScene(); renderTokens();
+  scheduleAutoSave();
+}
+function updateFieldBtnLabel() {
+  const def = getFieldDef();
+  const dims = getFieldDims();
+  const btn = document.getElementById("fieldBtn");
+  if (!btn) return;
+  if (def.category === "cheer") {
+    btn.textContent = `${def.icon} ${def.matMode === "usa" ? "USA (9)" : "JCA (7)"}`;
+  } else {
+    btn.textContent = `${def.icon} ${def.label} ${dims.widthM.toFixed(0)}×${dims.depthM.toFixed(0)}m`;
+  }
+}
+const fieldModal = document.getElementById("fieldModal");
+document.getElementById("fieldBtn").addEventListener("click", () => {
+  renderFieldModal();
+  fieldModal.classList.add("show");
+});
+document.getElementById("fieldClose").addEventListener("click", () => fieldModal.classList.remove("show"));
+fieldModal.addEventListener("click", e => { if (e.target === fieldModal) fieldModal.classList.remove("show"); });
+
+function renderFieldModal() {
+  const list = document.getElementById("fieldList");
+  list.innerHTML = "";
+  Object.entries(FIELD_TYPES).forEach(([key, def]) => {
+    const card = document.createElement("button");
+    card.className = "field-card" + (key === fieldType ? " on" : "");
+    card.dataset.fieldType = key;
+    const dims = (key === fieldType) ? getFieldDims() : { widthM: def.widthM, depthM: def.depthM };
+    card.innerHTML = `
+      <div class="field-card-icon">${def.icon}</div>
+      <div class="field-card-label">${def.label}</div>
+      <div class="field-card-size">${dims.widthM.toFixed(1)}m × ${dims.depthM.toFixed(1)}m</div>
+    `;
+    card.addEventListener("click", () => {
+      list.querySelectorAll(".field-card").forEach(c => c.classList.remove("on"));
+      card.classList.add("on");
+      // サイズ入力欄の有効/無効を更新
+      updateFieldSizeInputs(key);
+    });
+    list.appendChild(card);
   });
+  // initial size inputs
+  updateFieldSizeInputs(fieldType);
+}
+function updateFieldSizeInputs(forType) {
+  const def = FIELD_TYPES[forType] || FIELD_TYPES["usa-mat"];
+  const wIn = document.getElementById("fieldWidthInput");
+  const dIn = document.getElementById("fieldDepthInput");
+  const note = document.getElementById("fieldSizeNote");
+  const dims = forType === fieldType ? getFieldDims() : { widthM: def.widthM, depthM: def.depthM };
+  wIn.value = dims.widthM.toFixed(2);
+  dIn.value = dims.depthM.toFixed(2);
+  wIn.disabled = !def.sizeEditable;
+  dIn.disabled = !def.sizeEditable;
+  note.textContent = def.sizeEditable
+    ? "サイズはメートル単位で変更できます（0.1m 刻み）"
+    : "チア用マットは規格固定のためサイズ変更不可。";
+}
+document.getElementById("fieldApplyBtn").addEventListener("click", () => {
+  const list = document.getElementById("fieldList");
+  const selected = list.querySelector(".field-card.on");
+  if (!selected) return;
+  const newType = selected.dataset.fieldType;
+  const def = FIELD_TYPES[newType];
+  let nw = null, nd = null;
+  if (def.sizeEditable) {
+    const w = parseFloat(document.getElementById("fieldWidthInput").value);
+    const d = parseFloat(document.getElementById("fieldDepthInput").value);
+    if (isFinite(w) && w >= 3 && w <= 200) nw = w;
+    if (isFinite(d) && d >= 3 && d <= 200) nd = d;
+  }
+  applyFieldChange(newType, nw, nd);
+  fieldModal.classList.remove("show");
+  showHint(`${def.icon} ${def.label} に変更しました`);
+  snapshot("フィールド変更");
 });
 
 // View selector (top vs front)
