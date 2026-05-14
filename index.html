@@ -37,7 +37,7 @@
   .app {
     display: grid;
     grid-template-rows: auto 1fr auto;
-    height: 100vh;
+    height: 100%; /* body (position:fixed) を基準にすることで Android のアドレスバー出現でもオーバーフローしない */
   }
   /* Header */
   header {
